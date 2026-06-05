@@ -12,7 +12,7 @@ from backend.app.core.database_url import normalize_database_url
 
 
 async def wait_for_database() -> None:
-    database_url = normalize_database_url(str(settings.DATABASE_URL))
+    database_url = normalize_database_url(settings.effective_database_url)
     engine = create_async_engine(database_url, pool_pre_ping=True)
     delay_seconds = 2
     max_attempts = 30
