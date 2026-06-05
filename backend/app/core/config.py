@@ -1,8 +1,10 @@
 from urllib.parse import quote_plus
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
     DATABASE_URL: str = ""
     PGHOST: str = ""
     PGPORT: str = "5432"
@@ -28,10 +30,6 @@ class Settings(BaseSettings):
                 f"@{self.PGHOST}:{self.PGPORT}/{self.PGDATABASE}"
             )
         return "postgresql+asyncpg://postgres:password@localhost:5432/astrocycle"
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 settings = Settings()
