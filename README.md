@@ -54,7 +54,7 @@ Ini akan menyiapkan PostgreSQL pada `localhost:5432` dengan kredensial default y
 
 ### 1. Setup environment
 
-Gunakan Python 3.12 untuk backend lokal. Dependency backend dipin agar konsisten dengan `backend/Dockerfile`; Python yang lebih baru dapat memaksa beberapa package scientific dibuild dari source.
+Gunakan Python 3.11 untuk backend lokal agar konsisten dengan image Railway. Python 3.12 masih bisa dipakai, tetapi Python yang lebih baru dapat memaksa beberapa package scientific dibuild dari source.
 Gunakan Node.js 20 atau lebih baru untuk frontend.
 
 ```powershell

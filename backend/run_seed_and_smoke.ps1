@@ -7,7 +7,7 @@ Set-Location $root
 $pythonVersionOutput = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
 $pythonVersion = [version]$pythonVersionOutput
 if ($pythonVersion.Major -ne 3 -or $pythonVersion.Minor -gt 12) {
-    throw "AstroCycle backend dependencies are pinned for Python 3.12 or lower. Found Python $pythonVersionOutput. Install Python 3.12 and recreate .venv."
+    throw "AstroCycle backend dependencies are pinned for Python 3.12 or lower. Found Python $pythonVersionOutput. Install Python 3.11 or 3.12 and recreate .venv."
 }
 
 if (-not (Test-Path .venv)) {
