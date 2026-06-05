@@ -1,3 +1,4 @@
+import os
 from urllib.parse import quote_plus
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,13 +22,19 @@ class Settings(BaseSettings):
 
     @property
     def effective_database_url(self) -> str:
-        if self.DATABASE_URL:
+        is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))
+        if self.DATABASE_URL and not (is_railway and "localhost" in self.DATABASE_URL):
             return self.DATABASE_URL
         if self.PGHOST and self.PGDATABASE and self.PGUSER:
             password = quote_plus(self.PGPASSWORD)
             return (
                 f"postgresql+asyncpg://{self.PGUSER}:{password}"
                 f"@{self.PGHOST}:{self.PGPORT}/{self.PGDATABASE}"
+            )
+        if is_railway:
+            raise ValueError(
+                "Railway database is not configured. Add DATABASE_URL as a variable reference "
+                "to the Postgres service, for example ${{Postgres.DATABASE_URL}}."
             )
         return "postgresql+asyncpg://postgres:password@localhost:5432/astrocycle"
 
