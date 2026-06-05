@@ -1,0 +1,36 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from backend.app.api.v1.router import router as v1_router
+from backend.app.api.planets import router as planets_router
+from backend.app.api.cycle import router as cycle_router
+from backend.app.api.composite import router as composite_router
+from backend.app.api.scanner import router as scanner_router
+from backend.app.api.turning_points import router as turning_points_router
+from backend.app.api.analyst import router as analyst_router
+from backend.app.core.config import settings
+
+app = FastAPI(
+    title="AstroCycle API",
+    version="1.0.0",
+    description="AstroCycle backend untuk SaaS cycle forecasting.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(v1_router, prefix="/v1")
+app.include_router(planets_router, prefix="/api")
+app.include_router(cycle_router, prefix="/api")
+app.include_router(composite_router, prefix="/api")
+app.include_router(scanner_router, prefix="/api")
+app.include_router(turning_points_router, prefix="/api")
+app.include_router(analyst_router, prefix="/api")
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
