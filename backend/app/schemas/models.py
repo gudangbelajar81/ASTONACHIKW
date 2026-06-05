@@ -1,19 +1,20 @@
 from datetime import date
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AstroMeasurementRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     date: date
     body: str
     longitude: float
     value: Optional[float]
 
-    class Config:
-        orm_mode = True
-
 
 class MarketPriceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     date: date
     symbol: str
     close: float
@@ -22,19 +23,15 @@ class MarketPriceRead(BaseModel):
     low: Optional[float]
     volume: Optional[float]
 
-    class Config:
-        orm_mode = True
-
 
 class CycleCandidateRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     name: str
     body_a: str
     body_b: str
     score: Optional[float]
     details: Optional[str]
-
-    class Config:
-        orm_mode = True
 
 
 class ScanResult(BaseModel):

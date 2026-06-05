@@ -1,19 +1,10 @@
 from datetime import date
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class PlanetPositions(BaseModel):
-    date: date
-    sun: float
-    moon: float
-    mercury: float
-    venus: float
-    mars: float
-    jupiter: float
-    saturn: float
-
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "date": "2025-01-01",
                 "sun": 123.45,
@@ -25,3 +16,13 @@ class PlanetPositions(BaseModel):
                 "saturn": 45.19,
             }
         }
+    )
+
+    date: date
+    sun: float
+    moon: float
+    mercury: float
+    venus: float
+    mars: float
+    jupiter: float
+    saturn: float

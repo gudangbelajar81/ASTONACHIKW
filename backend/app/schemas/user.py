@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class UserBase(BaseModel):
@@ -11,10 +11,9 @@ class UserCreate(UserBase):
 
 
 class UserRead(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     is_active: bool
     is_admin: bool
     created_at: datetime
-
-    class Config:
-        orm_mode = True

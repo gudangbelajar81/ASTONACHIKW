@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SubscriptionCreate(BaseModel):
@@ -9,11 +9,10 @@ class SubscriptionCreate(BaseModel):
 
 
 class SubscriptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     plan: str
     status: str
     started_at: datetime
     expires_at: datetime
-
-    class Config:
-        orm_mode = True
