@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_URL: str = "http://localhost:8000"
+    SWISSEPH_PATH: str = "./ephemeris"
     OPENAI_API_KEY: str = ""
 
     @property
