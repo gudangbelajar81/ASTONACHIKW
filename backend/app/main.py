@@ -9,6 +9,8 @@ from backend.app.api.turning_points import router as turning_points_router
 from backend.app.api.analyst import router as analyst_router
 from backend.app.core.config import settings
 
+frontend_origins = [origin.strip() for origin in settings.FRONTEND_URL.split(",") if origin.strip()]
+
 app = FastAPI(
     title="AstroCycle API",
     version="1.0.0",
@@ -17,7 +19,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

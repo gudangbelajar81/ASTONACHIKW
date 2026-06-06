@@ -30,7 +30,8 @@ type DashboardData = {
   analysis: AnalystSummary | null;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 const defaultCombinations = [
   { planet_a: "Venus", planet_b: "Jupiter", weight: 1 },
