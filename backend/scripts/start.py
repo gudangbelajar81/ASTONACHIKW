@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -33,8 +34,19 @@ async def wait_for_database() -> None:
 
 
 def run_migrations() -> None:
+    root_dir = Path(__file__).resolve().parents[2]
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        str(root_dir)
+        if not existing_pythonpath
+        else f"{root_dir}{os.pathsep}{existing_pythonpath}"
+    )
+
     subprocess.run(
         ["alembic", "-c", "backend/alembic.ini", "upgrade", "head"],
+        cwd=root_dir,
+        env=env,
         check=True,
     )
 
