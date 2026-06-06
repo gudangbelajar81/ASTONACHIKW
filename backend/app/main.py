@@ -31,6 +31,18 @@ app.include_router(scanner_router, prefix="/api")
 app.include_router(turning_points_router, prefix="/api")
 app.include_router(analyst_router, prefix="/api")
 
+
+@app.get("/")
+def root():
+    return {
+        "name": "AstroCycle API",
+        "status": "online",
+        "health": "/health",
+        "docs": "/docs",
+        "api_prefixes": ["/api", "/v1"],
+    }
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
