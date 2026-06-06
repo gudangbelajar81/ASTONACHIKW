@@ -1,7 +1,14 @@
+import json
+import urllib.error
+import urllib.request
 from typing import Dict, Any, List, Optional
-from datetime import date
 from openai import OpenAI, APIError
 from backend.app.core.config import settings
+
+AI_SYSTEM_MESSAGE = (
+    "Anda adalah analis pasar ahli untuk trader ritel di Asia. "
+    "Selalu jawab dalam Bahasa Indonesia yang jelas, ringkas, dan dapat ditindaklanjuti."
+)
 
 
 class AnalystInput:
@@ -119,6 +126,170 @@ Gunakan bahasa yang mudah dipahami trader ritel berpengalaman."""
     return prompt
 
 
+def split_keys(raw_keys: str) -> list[str]:
+    return [key.strip() for key in raw_keys.split(",") if key.strip()]
+
+
+def provider_order() -> list[str]:
+    return [provider.strip().lower() for provider in settings.AI_PROVIDER_ORDER.split(",") if provider.strip()]
+
+
+def parse_generated_analysis(ticker: str, response_text: str) -> AnalystOutput:
+    sections = parse_analysis_response(response_text)
+    if not any(value.strip() for value in sections.values()):
+        clean_text = response_text.strip()
+        return AnalystOutput(
+            ticker=ticker,
+            summary=clean_text,
+            cycle_explanation="Analisis model diterima, tetapi format bagian tidak lengkap.",
+            turning_points_explanation="Gunakan titik balik pada dashboard sebagai zona perhatian tambahan.",
+            scan_explanation="Gunakan daftar scanner sebagai konfirmasi pendukung.",
+            outlook="Tetap kombinasikan pembacaan AI dengan manajemen risiko.",
+        )
+    return AnalystOutput(
+        ticker=ticker,
+        summary=sections.get("summary", ""),
+        cycle_explanation=sections.get("cycle_explanation", ""),
+        turning_points_explanation=sections.get("turning_points_explanation", ""),
+        scan_explanation=sections.get("scan_explanation", ""),
+        outlook=sections.get("outlook", ""),
+    )
+
+
+def call_openai_compatible(
+    *,
+    api_key: str,
+    model: str,
+    prompt: str,
+    base_url: str | None = None,
+) -> str:
+    client_kwargs: dict[str, Any] = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    client = OpenAI(**client_kwargs)
+    message = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": AI_SYSTEM_MESSAGE},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.7,
+        max_tokens=1500,
+    )
+    return message.choices[0].message.content or ""
+
+
+def call_gemini(*, api_key: str, model: str, prompt: str) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    payload = {
+        "systemInstruction": {"parts": [{"text": AI_SYSTEM_MESSAGE}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1500},
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=45) as response:
+        body = json.loads(response.read().decode("utf-8"))
+
+    candidates = body.get("candidates") or []
+    if not candidates:
+        raise ValueError("Gemini tidak mengembalikan kandidat jawaban.")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text = "".join(part.get("text", "") for part in parts)
+    if not text.strip():
+        raise ValueError("Gemini mengembalikan jawaban kosong.")
+    return text
+
+
+def local_analysis(analyst_input: AnalystInput) -> AnalystOutput:
+    recent_cycle = analyst_input.composite_cycle_data[-30:] if analyst_input.composite_cycle_data else []
+    latest_value = recent_cycle[-1].get("value", 0) if recent_cycle else 0
+    previous_value = recent_cycle[-7].get("value", latest_value) if len(recent_cycle) >= 7 else latest_value
+    direction = "menguat" if latest_value >= previous_value else "melemah"
+    bias = "positif" if latest_value > 0 else "negatif" if latest_value < 0 else "netral"
+    top_scanner = analyst_input.scanner_results[0] if analyst_input.scanner_results else None
+    top_turning = analyst_input.turning_points[0] if analyst_input.turning_points else None
+
+    return AnalystOutput(
+        ticker=analyst_input.ticker,
+        summary=(
+            f"{analyst_input.ticker} menunjukkan bias siklus {bias} dengan nilai terbaru "
+            f"{latest_value:.3f}. Dalam beberapa sesi terakhir, siklus tampak {direction}."
+        ),
+        cycle_explanation=(
+            "Siklus komposit membaca gabungan beberapa pasangan planet untuk melihat tekanan momentum. "
+            "Nilai di atas nol cenderung mendukung bias konstruktif, sedangkan nilai di bawah nol menandakan area yang lebih defensif."
+        ),
+        turning_points_explanation=(
+            f"Titik balik terdekat berada pada {top_turning.get('date')} dengan tipe {top_turning.get('type')} "
+            f"dan kekuatan {top_turning.get('strength')}/100. Gunakan tanggal ini sebagai zona perhatian, bukan sinyal masuk tunggal."
+            if top_turning
+            else "Belum ada titik balik kuat yang terdeteksi dari data saat ini. Fokus utama tetap pada perubahan arah garis komposit."
+        ),
+        scan_explanation=(
+            f"Kombinasi teratas saat ini adalah {top_scanner.get('cycle')} dengan skor {top_scanner.get('score', 0):.3f}. "
+            "Semakin tinggi skor, semakin layak kombinasi itu dipantau sebagai konfirmasi tambahan."
+            if top_scanner
+            else "Scanner belum mengembalikan kombinasi dominan, sehingga pembacaan utama memakai siklus komposit."
+        ),
+        outlook=(
+            "Prospek masih perlu dibaca bertahap: tunggu konfirmasi dari arah siklus, area titik balik, "
+            "dan disiplin risiko sebelum mengambil keputusan trading."
+        ),
+    )
+
+
+def generate_with_provider(provider: str, prompt: str) -> str:
+    errors = []
+    if provider == "openai":
+        for key in split_keys(settings.OPENAI_API_KEY):
+            try:
+                return call_openai_compatible(api_key=key, model=settings.OPENAI_MODEL, prompt=prompt)
+            except Exception as exc:
+                errors.append(str(exc))
+        raise ValueError("; ".join(errors) or "OPENAI_API_KEY kosong")
+    if provider == "gemini":
+        for key in split_keys(settings.GEMINI_API_KEY):
+            try:
+                return call_gemini(api_key=key, model=settings.GEMINI_MODEL, prompt=prompt)
+            except Exception as exc:
+                errors.append(str(exc))
+        raise ValueError("; ".join(errors) or "GEMINI_API_KEY kosong")
+    if provider in {"deepseek", "deepseek-ai"}:
+        for key in split_keys(settings.DEEPSEEK_API_KEY):
+            try:
+                return call_openai_compatible(
+                    api_key=key,
+                    model=settings.DEEPSEEK_MODEL,
+                    prompt=prompt,
+                    base_url="https://api.deepseek.com",
+                )
+            except Exception as exc:
+                errors.append(str(exc))
+        raise ValueError("; ".join(errors) or "DEEPSEEK_API_KEY kosong")
+    if provider in {"xai", "grok"}:
+        for key in split_keys(settings.XAI_API_KEY):
+            try:
+                return call_openai_compatible(
+                    api_key=key,
+                    model=settings.XAI_MODEL,
+                    prompt=prompt,
+                    base_url="https://api.x.ai/v1",
+                )
+            except Exception as exc:
+                errors.append(str(exc))
+        raise ValueError("; ".join(errors) or "XAI_API_KEY kosong")
+    raise ValueError(f"Provider AI tidak dikenal: {provider}")
+
+
 async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
     """
     Generate AI-powered market analysis using OpenAI.
@@ -129,47 +300,21 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
     Returns:
         AnalystOutput with structured analysis
 
-    Raises:
-        ValueError: If OpenAI API key is missing or API call fails
+    Falls back to local analysis when no provider is configured or all providers fail.
     """
-    if not settings.OPENAI_API_KEY:
-        raise ValueError("OpenAI API key not configured. Set OPENAI_API_KEY in .env")
+    prompt = format_analyst_prompt(analyst_input)
+    errors = []
 
-    try:
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        prompt = format_analyst_prompt(analyst_input)
+    for provider in provider_order():
+        try:
+            response_text = generate_with_provider(provider, prompt)
+            if response_text.strip():
+                return parse_generated_analysis(analyst_input.ticker, response_text)
+        except (APIError, urllib.error.URLError, urllib.error.HTTPError, ValueError, Exception) as exc:
+            errors.append(f"{provider}: {exc}")
+            continue
 
-        message = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Anda adalah analis pasar ahli untuk trader ritel di Asia. Selalu jawab dalam Bahasa Indonesia yang jelas, ringkas, dan dapat ditindaklanjuti.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.7,
-            max_tokens=1500,
-        )
-
-        response_text = message.choices[0].message.content
-
-        # Parse response sections
-        sections = parse_analysis_response(response_text)
-
-        return AnalystOutput(
-            ticker=analyst_input.ticker,
-            summary=sections.get("summary", ""),
-            cycle_explanation=sections.get("cycle_explanation", ""),
-            turning_points_explanation=sections.get("turning_points_explanation", ""),
-            scan_explanation=sections.get("scan_explanation", ""),
-            outlook=sections.get("outlook", ""),
-        )
-
-    except APIError as e:
-        raise ValueError(f"OpenAI API error: {str(e)}")
-    except Exception as e:
-        raise ValueError(f"Error generating analysis: {str(e)}")
+    return local_analysis(analyst_input)
 
 
 def parse_analysis_response(response_text: str) -> Dict[str, str]:

@@ -18,7 +18,15 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_URL: str = "http://localhost:8000"
     SWISSEPH_PATH: str = "./ephemeris"
+    AI_PROVIDER_ORDER: str = "openai,gemini,deepseek,xai"
     OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+    XAI_API_KEY: str = ""
+    XAI_MODEL: str = "grok-4.3"
 
     @property
     def effective_database_url(self) -> str:
