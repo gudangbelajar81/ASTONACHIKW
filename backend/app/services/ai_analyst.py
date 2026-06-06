@@ -60,16 +60,16 @@ def format_analyst_prompt(analyst_input: AnalystInput) -> str:
     recent_cycle = analyst_input.composite_cycle_data[-30:] if analyst_input.composite_cycle_data else []
     cycle_values = [d.get("value", 0) for d in recent_cycle]
     cycle_dates = [d.get("date", "") for d in recent_cycle]
-    current_trend = "Neutral"
+    current_trend = "Netral"
     if cycle_values:
-        current_trend = "Positive" if cycle_values[-1] > 0 else "Negative"
+        current_trend = "Positif" if cycle_values[-1] > 0 else "Negatif"
 
     # Format turning points
     turning_points_str = ""
     if analyst_input.turning_points:
         turning_points_str = "\n".join(
             [
-                f"- {tp['date']}: {tp['type']} (Strength: {tp['strength']}/100)"
+                f"- {tp['date']}: {tp['type']} (Kekuatan: {tp['strength']}/100)"
                 for tp in sorted(
                     analyst_input.turning_points, key=lambda x: x.get("date", "")
                 )[-5:]
@@ -81,39 +81,40 @@ def format_analyst_prompt(analyst_input: AnalystInput) -> str:
     if analyst_input.scanner_results:
         scanner_str = "\n".join(
             [
-                f"- {r['cycle']}: Correlation {r['correlation']:.2f}, "
-                f"Lag {r['lag_days']}d, Accuracy {r['accuracy']:.0%}, Score {r['score']:.3f}"
+                f"- {r['cycle']}: Korelasi {r['correlation']:.2f}, "
+                f"Jeda {r['lag_days']} hari, Akurasi {r['accuracy']:.0%}, Skor {r['score']:.3f}"
                 for r in analyst_input.scanner_results[:5]
             ]
         )
 
-    prompt = f"""You are an expert market analyst specializing in astrological cycle analysis.
+    prompt = f"""Anda adalah analis pasar ahli yang berfokus pada analisis siklus astrologi.
 
-Analyze the following market data and provide a human-readable explanation:
+Analisis data pasar berikut dan berikan penjelasan yang mudah dipahami dalam Bahasa Indonesia:
 
 MARKET TICKER: {analyst_input.ticker}
 
 COMPOSITE CYCLE DATA (Last 30 days):
 Dates: {', '.join(str(d) for d in cycle_dates[-10:])}
 Values: {', '.join(f'{v:.2f}' for v in cycle_values[-10:])}
-Current Trend: {current_trend}
+Tren Saat Ini: {current_trend}
 
 RECENT TURNING POINTS:
-{turning_points_str if turning_points_str else "No turning points detected"}
+{turning_points_str if turning_points_str else "Tidak ada titik balik terdeteksi"}
 
 TOP PLANETARY COMBINATIONS:
-{scanner_str if scanner_str else "No scan results available"}
+{scanner_str if scanner_str else "Tidak ada hasil scanner tersedia"}
 
-Please provide analysis in the following format:
+Berikan analisis dalam format berikut. Gunakan judul bagian persis seperti ini agar sistem bisa membacanya:
 
-1. **Summary** (1-2 sentences): Brief overview of the current cycle state
-2. **Cycle Explanation** (2-3 sentences): Explain the composite cycle trend and what it means for the market
-3. **Turning Points Explanation** (2-3 sentences): Analyze recent tops/bottoms and their significance
-4. **Scanner Insights** (2-3 sentences): Highlight the strongest planetary combinations and their predictive value
-5. **Market Outlook** (2-3 sentences): Provide forward-looking perspective based on all signals
+1. **Summary** (1-2 kalimat): Ringkasan singkat kondisi siklus saat ini
+2. **Cycle Explanation** (2-3 kalimat): Jelaskan tren siklus komposit dan maknanya untuk pasar
+3. **Turning Points Explanation** (2-3 kalimat): Analisis puncak/dasar terbaru dan signifikansinya
+4. **Scanner Insights** (2-3 kalimat): Sorot kombinasi planet terkuat dan nilai prediktifnya
+5. **Market Outlook** (2-3 kalimat): Berikan pandangan ke depan berdasarkan semua sinyal
 
-Be specific about dates, cycle names (e.g., "Venus-Jupiter"), and potential price movements.
-Use language that is accessible to experienced retail traders."""
+Wajib jawab dalam Bahasa Indonesia.
+Tetap spesifik tentang tanggal, nama siklus (misalnya "Venus-Jupiter"), dan potensi pergerakan harga.
+Gunakan bahasa yang mudah dipahami trader ritel berpengalaman."""
 
     return prompt
 
@@ -143,7 +144,7 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert market analyst specializing in astrological cycle analysis for retail traders in Asia. Provide clear, actionable insights.",
+                    "content": "Anda adalah analis pasar ahli untuk trader ritel di Asia. Selalu jawab dalam Bahasa Indonesia yang jelas, ringkas, dan dapat ditindaklanjuti.",
                 },
                 {"role": "user", "content": prompt},
             ],

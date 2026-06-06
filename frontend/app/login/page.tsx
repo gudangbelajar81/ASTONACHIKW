@@ -85,7 +85,7 @@ export default function LoginPage() {
     const userMatch = users.some((user) => user.email === normalizedEmail && user.password === password);
 
     if (!demoMatch && !userMatch) {
-      setError("Akun tidak ditemukan. Pakai demo account atau buat akun lokal dulu.");
+      setError("Akun tidak ditemukan. Pakai akun demo atau buat akun lokal dulu.");
       return false;
     }
 
@@ -117,7 +117,7 @@ export default function LoginPage() {
         try {
           await tryApiSignup();
         } catch {
-          // Backend is optional in local demo mode.
+          // Backend bersifat opsional saat memakai mode demo lokal.
         }
 
         if (signupLocally()) {
@@ -147,16 +147,16 @@ export default function LoginPage() {
     <main className="login-page">
       <section className="login-card">
         <div className="login-card__header">
-          <p>AstroCycle Access</p>
-          <h1>{mode === "login" ? "Sign in" : "Create account"}</h1>
+          <p>Akses AstroCycle</p>
+          <h1>{mode === "login" ? "Masuk" : "Buat Akun"}</h1>
         </div>
 
         <div className="auth-tabs" aria-label="Authentication mode">
           <button className={mode === "login" ? "active" : ""} type="button" onClick={() => setMode("login")}>
-            Sign in
+            Masuk
           </button>
           <button className={mode === "signup" ? "active" : ""} type="button" onClick={() => setMode("signup")}>
-            Create
+            Daftar
           </button>
         </div>
 
@@ -172,7 +172,7 @@ export default function LoginPage() {
             />
           </label>
           <label>
-            Password
+            Kata Sandi
             <input
               className="input"
               type="password"
@@ -184,14 +184,14 @@ export default function LoginPage() {
           </label>
 
           <div className="demo-credential">
-            <strong>Demo:</strong> {DEMO_EMAIL} / {DEMO_PASSWORD}
+            <strong>Akun demo:</strong> {DEMO_EMAIL} / {DEMO_PASSWORD}
           </div>
 
           {status ? <p className="form-status">{status}</p> : null}
           {error ? <p className="form-error">{error}</p> : null}
 
           <button className="button" type="submit" disabled={submitting}>
-            {submitting ? "Processing..." : mode === "login" ? "Sign in" : "Create account"}
+            {submitting ? "Memproses..." : mode === "login" ? "Masuk" : "Buat Akun"}
           </button>
         </form>
       </section>

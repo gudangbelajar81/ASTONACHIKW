@@ -18,12 +18,12 @@ type AIInfoPanelProps = {
 
 const fallbackSections = [
   {
-    title: "Cycle Context",
-    body: "Load a ticker to combine composite cycle data, turning points, and scanner rankings into an AI market read.",
+    title: "Konteks Siklus",
+    body: "Masukkan ticker untuk menggabungkan data siklus komposit, titik balik, dan peringkat scanner menjadi ringkasan pasar.",
   },
   {
-    title: "Signal Stack",
-    body: "The analyst works best after seed data is available and the backend can return recent planetary and market observations.",
+    title: "Susunan Sinyal",
+    body: "Analisis bekerja paling baik saat backend dapat membaca observasi planet dan pasar terbaru.",
   },
 ];
 
@@ -33,39 +33,39 @@ export default function AIInfoPanel({ analysis, loading, error, ticker }: AIInfo
       <div className="ai-panel__header">
         <div className="ai-panel__badge">AI</div>
         <div>
-          <div className="ai-panel__eyebrow">AI Analysis</div>
-          <div className="ai-panel__title">{analysis?.ticker ?? ticker} Analyst</div>
+          <div className="ai-panel__eyebrow">Analisis AI</div>
+          <div className="ai-panel__title">Analis {analysis?.ticker ?? ticker}</div>
         </div>
       </div>
 
       {loading ? (
-        <div className="ai-panel__notice">Generating market read...</div>
+        <div className="ai-panel__notice">Menyusun analisis pasar...</div>
       ) : error ? (
         <div className="ai-panel__notice ai-panel__notice--warning">{error}</div>
       ) : analysis ? (
         <>
           <section className="ai-panel__section">
-            <h4>Summary</h4>
+            <h4>Ringkasan</h4>
             <p>{analysis.summary}</p>
           </section>
 
           <section className="ai-panel__section">
-            <h4>Composite Cycle</h4>
+            <h4>Siklus Komposit</h4>
             <p>{analysis.cycle_explanation}</p>
           </section>
 
           <section className="ai-panel__section">
-            <h4>Turning Points</h4>
+            <h4>Titik Balik</h4>
             <p>{analysis.turning_points_explanation}</p>
           </section>
 
           <section className="ai-panel__section">
-            <h4>Scanner Insight</h4>
+            <h4>Insight Scanner</h4>
             <p>{analysis.scan_explanation}</p>
           </section>
 
           <div className="ai-panel__recommendation">
-            <div>Outlook</div>
+            <div>Prospek</div>
             <p>{analysis.outlook}</p>
           </div>
         </>

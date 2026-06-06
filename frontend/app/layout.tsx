@@ -3,12 +3,12 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "AstroCycle",
-  description: "AstroCycle SaaS dashboard for cycle forecasting.",
+  description: "Dasbor AstroCycle untuk prediksi siklus pasar.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="id" className="dark">
       <body>{children}</body>
     </html>
   );

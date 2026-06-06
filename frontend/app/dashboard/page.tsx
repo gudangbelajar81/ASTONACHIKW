@@ -179,7 +179,7 @@ export default function DashboardPage() {
 
         setData({ composite, scanner, turningPoints, analysis });
       } catch (analystError) {
-        setAnalysisError(analystError instanceof Error ? analystError.message : "AI analysis unavailable");
+        setAnalysisError(analystError instanceof Error ? analystError.message : "Analisis AI belum tersedia");
       }
     } catch (dashboardError) {
       const composite = buildDemoComposite(nextTicker);
@@ -190,8 +190,8 @@ export default function DashboardPage() {
       setDataMode("demo");
       setError(
         dashboardError instanceof Error
-          ? `Backend belum aktif, memakai data demo lokal. Detail: ${dashboardError.message}`
-          : "Backend belum aktif, memakai data demo lokal."
+          ? `Data live belum tersedia, memakai data demo lokal. Detail: ${dashboardError.message}`
+          : "Data live belum tersedia, memakai data demo lokal."
       );
       setData({ composite, scanner, turningPoints, analysis: buildDemoAnalysis(nextTicker) });
     } finally {
@@ -247,10 +247,10 @@ export default function DashboardPage() {
       <main className="dashboard-main">
         <div className="dashboard-header">
           <div>
-            <p className="dashboard-eyebrow">Dashboard</p>
-            <h1>Market Cycle Summary</h1>
+            <p className="dashboard-eyebrow">Dasbor</p>
+            <h1>Ringkasan Siklus Pasar</h1>
             <span className={`mode-pill mode-pill--${dataMode}`}>
-              {dataMode === "live" ? "Live API" : "Demo Local"}
+              {dataMode === "live" ? "Data Live" : "Demo Lokal"}
             </span>
           </div>
 
@@ -262,7 +262,7 @@ export default function DashboardPage() {
               placeholder="AAPL"
             />
             <button type="submit" disabled={loading || analysisLoading}>
-              {loading ? "Loading" : "Refresh"}
+              {loading ? "Memuat" : "Perbarui"}
             </button>
           </form>
         </div>
@@ -273,15 +273,15 @@ export default function DashboardPage() {
           <section className="cycle-workspace">
             <div className="metric-row">
               <div className="metric-card">
-                <span>Latest Cycle</span>
+                <span>Siklus Terbaru</span>
                 <strong>{latestPoint ? latestPoint.value.toFixed(3) : "--"}</strong>
               </div>
               <div className="metric-card">
-                <span>Projection</span>
-                <strong>{projectedCount ? `${projectedCount} days` : "--"}</strong>
+                <span>Proyeksi</span>
+                <strong>{projectedCount ? `${projectedCount} hari` : "--"}</strong>
               </div>
               <div className="metric-card">
-                <span>Signals</span>
+                <span>Sinyal</span>
                 <strong>{data.scanner.length || "--"}</strong>
               </div>
             </div>
@@ -289,17 +289,17 @@ export default function DashboardPage() {
             <div className="chart-panel">
               <div className="chart-panel__topline">
                 <div>
-                  <h2>{ticker} Composite Cycle</h2>
-                  <p>Default Venus-Jupiter, Moon-Saturn, and Mercury-Mars blend</p>
+                  <h2>Siklus Komposit {ticker}</h2>
+                  <p>Gabungan default Venus-Jupiter, Moon-Saturn, dan Mercury-Mars</p>
                 </div>
-                <span>{chartData.length} points</span>
+                <span>{chartData.length} titik</span>
               </div>
               <div ref={chartContainerRef} className="chart-card" />
             </div>
 
             <div className="insight-grid">
               <section className="insight-card">
-                <h3>Top Cycle Signals</h3>
+                <h3>Sinyal Siklus Teratas</h3>
                 {data.scanner.length ? (
                   <ul>
                     {data.scanner.slice(0, 5).map((signal) => (
@@ -310,17 +310,17 @@ export default function DashboardPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p>No scanner results yet.</p>
+                  <p>Belum ada hasil scanner.</p>
                 )}
               </section>
 
               <section className="insight-card">
-                <h3>Next Turning Points</h3>
+                <h3>Titik Balik Berikutnya</h3>
                 <p>
-                  Major Top: <strong>{nextTop?.date ?? "Not detected"}</strong>
+                  Puncak Utama: <strong>{nextTop?.date ?? "Belum terdeteksi"}</strong>
                 </p>
                 <p>
-                  Major Bottom: <strong>{nextBottom?.date ?? "Not detected"}</strong>
+                  Dasar Utama: <strong>{nextBottom?.date ?? "Belum terdeteksi"}</strong>
                 </p>
               </section>
             </div>

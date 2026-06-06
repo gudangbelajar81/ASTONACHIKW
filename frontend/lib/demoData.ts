@@ -92,14 +92,14 @@ export function buildDemoTurningPoints(): TurningPoint[] {
 export function buildDemoAnalysis(ticker: string): AnalystSummary {
   return {
     ticker,
-    summary: `${ticker} is in demo mode with a constructive cycle bias and a near-term volatility window.`,
+    summary: `${ticker} sedang memakai mode demo dengan bias siklus yang cukup konstruktif dan potensi volatilitas jangka pendek.`,
     cycle_explanation:
-      "The composite cycle is rising from neutral territory while the projected segment remains positive. This favors waiting for confirmation rather than chasing extended candles.",
+      "Siklus komposit bergerak naik dari area netral, sementara proyeksi berikutnya masih cenderung positif. Kondisi ini lebih mendukung menunggu konfirmasi daripada mengejar candle yang sudah terlalu jauh.",
     turning_points_explanation:
-      "The next detected top and bottom windows are close enough to matter for swing planning. Treat them as timing zones, not exact reversal promises.",
+      "Jendela puncak dan dasar berikutnya cukup dekat untuk diperhatikan dalam rencana swing. Perlakukan tanggal tersebut sebagai zona waktu, bukan janji pembalikan yang pasti.",
     scan_explanation:
-      "Venus-Jupiter and Moon-Venus are the strongest demo combinations, with the best blend of correlation, lag, and directional accuracy.",
+      "Venus-Jupiter dan Moon-Venus menjadi kombinasi demo terkuat, dengan perpaduan korelasi, jeda waktu, dan akurasi arah yang paling baik.",
     outlook:
-      "Bias is cautiously bullish while the composite line holds above zero. A break back below neutral would shift the playbook toward defensive positioning.",
+      "Bias masih cenderung bullish secara hati-hati selama garis komposit bertahan di atas nol. Jika turun kembali ke bawah area netral, strategi perlu lebih defensif.",
   };
 }

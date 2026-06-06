@@ -9,13 +9,13 @@ export default function Sidebar() {
         <h2>AstroCycle</h2>
         <nav>
           <Link href="/dashboard" className="nav-link active">
-            Dashboard
+            Dasbor
           </Link>
           <Link href="/login" className="nav-link">
-            Account
+            Akun
           </Link>
           <Link href="/" className="nav-link">
-            Home
+            Beranda
           </Link>
         </nav>
       </div>

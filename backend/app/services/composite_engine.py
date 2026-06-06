@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.db.models import AstroMeasurement
-from backend.app.services.ephemeris_service import DEFAULT_PLANETS
+from backend.app.services.ephemeris_service import DEFAULT_PLANETS, get_body_longitude
 
 
 class CycleCombination:
@@ -42,14 +42,19 @@ async def calculate_composite_cycle(
     result = await session.execute(query)
     measurements = result.scalars().all()
 
-    if not measurements:
-        return []
-
     measurements_by_date = {}
     for m in measurements:
         if m.date not in measurements_by_date:
             measurements_by_date[m.date] = {}
         measurements_by_date[m.date][m.body] = m.longitude
+
+    if not measurements_by_date:
+        current = start_date
+        while current <= end_date:
+            measurements_by_date[current] = {
+                body: get_body_longitude(body, current) for body in DEFAULT_PLANETS
+            }
+            current += timedelta(days=1)
 
     composite_points = []
     for curr_date in sorted(measurements_by_date.keys()):
