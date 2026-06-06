@@ -6,9 +6,13 @@ import {
   ApiKeyEntry,
   ApiProviderConfig,
   DEFAULT_API_PROVIDERS,
+  DEFAULT_MARKET_PROVIDERS,
+  MarketProviderConfig,
   maskKey,
   readApiProviders,
+  readMarketProviders,
   writeApiProviders,
+  writeMarketProviders,
 } from "../../lib/apiKeys";
 
 const API_BASE_URL =
@@ -24,7 +28,9 @@ function createKeyEntry(rawKey: string): ApiKeyEntry {
 }
 
 export default function SettingsPage() {
+  const [section, setSection] = useState<"ai" | "market">("ai");
   const [providers, setProviders] = useState<ApiProviderConfig[]>(DEFAULT_API_PROVIDERS);
+  const [marketProviders, setMarketProviders] = useState<MarketProviderConfig[]>(DEFAULT_MARKET_PROVIDERS);
   const [activeProviderId, setActiveProviderId] = useState(DEFAULT_API_PROVIDERS[0].id);
   const [rawKeys, setRawKeys] = useState("");
   const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
@@ -33,11 +39,17 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setProviders(readApiProviders());
+    setMarketProviders(readMarketProviders());
   }, []);
 
   function saveProviders(nextProviders: ApiProviderConfig[]) {
     setProviders(nextProviders);
     writeApiProviders(nextProviders);
+  }
+
+  function saveMarketProviders(nextProviders: MarketProviderConfig[]) {
+    setMarketProviders(nextProviders);
+    writeMarketProviders(nextProviders);
   }
 
   const activeProvider = useMemo(
@@ -110,6 +122,17 @@ export default function SettingsPage() {
     }
   }
 
+  async function checkMarketProvider(provider: MarketProviderConfig) {
+    const nextStatus = provider.endpoint.trim() && provider.apiKey.trim() ? "live" : "dead";
+    saveMarketProviders(
+      marketProviders.map((item) =>
+        item.id === provider.id
+          ? { ...item, status: nextStatus, lastChecked: new Date().toISOString() }
+          : item
+      )
+    );
+  }
+
   return (
     <div className="dashboard-shell">
       <Sidebar />
@@ -117,10 +140,20 @@ export default function SettingsPage() {
         <div className="settings-header">
           <p className="dashboard-eyebrow">Settings</p>
           <h1>Pusat API</h1>
-          <p>Kelola key AI pribadi pengguna untuk Gemini, DeepSeek, Grok/xAI, dan OpenAI.</p>
+          <p>Kelola AI key dan provider data IDX/Bandarmology milik pengguna.</p>
         </div>
 
-        <div className="settings-layout">
+        <div className="settings-section-tabs">
+          <button className={section === "ai" ? "active" : ""} type="button" onClick={() => setSection("ai")}>
+            Pusat AI
+          </button>
+          <button className={section === "market" ? "active" : ""} type="button" onClick={() => setSection("market")}>
+            Pusat Data IDX
+          </button>
+        </div>
+
+        {section === "ai" ? (
+          <div className="settings-layout">
           <aside className="settings-tabs">
             {providers.map((provider) => (
               <button
@@ -216,7 +249,83 @@ export default function SettingsPage() {
               </form>
             ) : null}
           </section>
-        </div>
+          </div>
+        ) : (
+          <section className="api-center">
+            <div className="api-center__topline">
+              <div>
+                <h2>Data Provider Bandarmology IDX</h2>
+                <p>Provider ini disimpan di browser pengguna dan bisa dipakai untuk broker summary, foreign flow, dan order book saat API tersedia.</p>
+              </div>
+            </div>
+
+            <div className="market-provider-list">
+              {marketProviders.map((provider) => (
+                <article className="market-provider-card" key={provider.id}>
+                  <div className="market-provider-card__topline">
+                    <div>
+                      <h3>{provider.name}</h3>
+                      <p>{provider.notes}</p>
+                    </div>
+                    <span className={`api-status api-status--${provider.status}`}>
+                      {provider.status === "live" ? "LIVE" : provider.status === "dead" ? "DEAD" : "BELUM CEK"}
+                    </span>
+                  </div>
+
+                  <label>
+                    Endpoint API
+                    <input
+                      value={provider.endpoint}
+                      placeholder="https://provider-api.com/idx/broker-summary"
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, endpoint: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    API Key
+                    <input
+                      value={provider.apiKey}
+                      placeholder="Masukkan API key provider data"
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, apiKey: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
+
+                  <div className="market-provider-actions">
+                    <label className="provider-toggle">
+                      <input
+                        type="checkbox"
+                        checked={provider.enabled}
+                        onChange={(event) =>
+                          saveMarketProviders(
+                            marketProviders.map((item) =>
+                              item.id === provider.id ? { ...item, enabled: event.target.checked } : item
+                            )
+                          )
+                        }
+                      />
+                      Aktifkan provider
+                    </label>
+                    <button type="button" onClick={() => checkMarketProvider(provider)}>
+                      Cek Status
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );
