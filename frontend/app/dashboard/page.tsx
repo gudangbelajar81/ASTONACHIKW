@@ -30,8 +30,16 @@ type DashboardData = {
   analysis: AnalystSummary | null;
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+function getApiBaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL;
+  if (configuredUrl) return configuredUrl;
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".up.railway.app")) {
+    return "https://astonachikw-production.up.railway.app";
+  }
+  return "http://127.0.0.1:8000";
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 const defaultCombinations = [
   { planet_a: "Venus", planet_b: "Jupiter", weight: 1 },
