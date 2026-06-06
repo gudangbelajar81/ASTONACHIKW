@@ -13,6 +13,7 @@ import {
   ScannerResult,
   TurningPoint,
 } from "../../lib/demoData";
+import { buildAiRequestConfig, readApiProviders } from "../../lib/apiKeys";
 
 type ScannerResponse = {
   top_combinations: ScannerResult[];
@@ -174,6 +175,7 @@ export default function DashboardPage() {
               accuracy: result.accuracy,
               score: result.score,
             })),
+            ...buildAiRequestConfig(readApiProviders()),
           }),
         });
 

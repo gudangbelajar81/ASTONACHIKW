@@ -32,6 +32,27 @@ class AnalystRequestBody(BaseModel):
     scanner_results: Optional[List[ScannerResultData]] = Field(
         default=None, description="Top scanner results"
     )
+    ai_provider_order: Optional[List[str]] = Field(
+        default=None, description="Preferred AI provider order"
+    )
+    ai_api_keys: Optional[Dict[str, List[str]]] = Field(
+        default=None, description="User-provided API keys by provider"
+    )
+    ai_models: Optional[Dict[str, str]] = Field(
+        default=None, description="User-selected AI model by provider"
+    )
+
+
+class AnalystKeyTestRequest(BaseModel):
+    provider: str = Field(..., description="AI provider name")
+    api_key: str = Field(..., description="API key to test")
+    model: Optional[str] = Field(default=None, description="Model override")
+
+
+class AnalystKeyTestResponse(BaseModel):
+    provider: str
+    status: str
+    detail: str
 
 
 class AnalystResponse(BaseModel):

@@ -18,11 +18,17 @@ class AnalystInput:
         composite_cycle_data: List[Dict[str, Any]],
         turning_points: List[Dict[str, Any]],
         scanner_results: Optional[List[Dict[str, Any]]] = None,
+        ai_provider_order: Optional[List[str]] = None,
+        ai_api_keys: Optional[Dict[str, List[str]]] = None,
+        ai_models: Optional[Dict[str, str]] = None,
     ):
         self.ticker = ticker
         self.composite_cycle_data = composite_cycle_data
         self.turning_points = turning_points
         self.scanner_results = scanner_results or []
+        self.ai_provider_order = ai_provider_order or []
+        self.ai_api_keys = ai_api_keys or {}
+        self.ai_models = ai_models or {}
 
 
 class AnalystOutput:
@@ -126,11 +132,15 @@ Gunakan bahasa yang mudah dipahami trader ritel berpengalaman."""
     return prompt
 
 
-def split_keys(raw_keys: str) -> list[str]:
+def split_keys(raw_keys: str | list[str]) -> list[str]:
+    if isinstance(raw_keys, list):
+        return [key.strip() for key in raw_keys if key and key.strip()]
     return [key.strip() for key in raw_keys.split(",") if key.strip()]
 
 
-def provider_order() -> list[str]:
+def provider_order(override: Optional[List[str]] = None) -> list[str]:
+    if override:
+        return [provider.strip().lower() for provider in override if provider.strip()]
     return [provider.strip().lower() for provider in settings.AI_PROVIDER_ORDER.split(",") if provider.strip()]
 
 
@@ -247,28 +257,69 @@ def local_analysis(analyst_input: AnalystInput) -> AnalystOutput:
     )
 
 
-def generate_with_provider(provider: str, prompt: str) -> str:
+def get_provider_keys(provider: str, overrides: Optional[Dict[str, List[str]]] = None) -> list[str]:
+    if overrides and provider in overrides:
+        return split_keys(overrides[provider])
+    if provider == "openai":
+        return split_keys(settings.OPENAI_API_KEY)
+    if provider == "gemini":
+        return split_keys(settings.GEMINI_API_KEY)
+    if provider in {"deepseek", "deepseek-ai"}:
+        return split_keys(settings.DEEPSEEK_API_KEY)
+    if provider in {"xai", "grok"}:
+        return split_keys(settings.XAI_API_KEY)
+    return []
+
+
+def get_provider_model(provider: str, overrides: Optional[Dict[str, str]] = None) -> str:
+    if overrides and overrides.get(provider):
+        return overrides[provider]
+    if provider == "openai":
+        return settings.OPENAI_MODEL
+    if provider == "gemini":
+        return settings.GEMINI_MODEL
+    if provider in {"deepseek", "deepseek-ai"}:
+        return settings.DEEPSEEK_MODEL
+    if provider in {"xai", "grok"}:
+        return settings.XAI_MODEL
+    return ""
+
+
+def generate_with_provider(
+    provider: str,
+    prompt: str,
+    key_overrides: Optional[Dict[str, List[str]]] = None,
+    model_overrides: Optional[Dict[str, str]] = None,
+) -> str:
     errors = []
     if provider == "openai":
-        for key in split_keys(settings.OPENAI_API_KEY):
+        for key in get_provider_keys(provider, key_overrides):
             try:
-                return call_openai_compatible(api_key=key, model=settings.OPENAI_MODEL, prompt=prompt)
+                return call_openai_compatible(
+                    api_key=key,
+                    model=get_provider_model(provider, model_overrides),
+                    prompt=prompt,
+                )
             except Exception as exc:
                 errors.append(str(exc))
         raise ValueError("; ".join(errors) or "OPENAI_API_KEY kosong")
     if provider == "gemini":
-        for key in split_keys(settings.GEMINI_API_KEY):
+        for key in get_provider_keys(provider, key_overrides):
             try:
-                return call_gemini(api_key=key, model=settings.GEMINI_MODEL, prompt=prompt)
+                return call_gemini(
+                    api_key=key,
+                    model=get_provider_model(provider, model_overrides),
+                    prompt=prompt,
+                )
             except Exception as exc:
                 errors.append(str(exc))
         raise ValueError("; ".join(errors) or "GEMINI_API_KEY kosong")
     if provider in {"deepseek", "deepseek-ai"}:
-        for key in split_keys(settings.DEEPSEEK_API_KEY):
+        for key in get_provider_keys(provider, key_overrides):
             try:
                 return call_openai_compatible(
                     api_key=key,
-                    model=settings.DEEPSEEK_MODEL,
+                    model=get_provider_model(provider, model_overrides),
                     prompt=prompt,
                     base_url="https://api.deepseek.com",
                 )
@@ -276,11 +327,11 @@ def generate_with_provider(provider: str, prompt: str) -> str:
                 errors.append(str(exc))
         raise ValueError("; ".join(errors) or "DEEPSEEK_API_KEY kosong")
     if provider in {"xai", "grok"}:
-        for key in split_keys(settings.XAI_API_KEY):
+        for key in get_provider_keys(provider, key_overrides):
             try:
                 return call_openai_compatible(
                     api_key=key,
-                    model=settings.XAI_MODEL,
+                    model=get_provider_model(provider, model_overrides),
                     prompt=prompt,
                     base_url="https://api.x.ai/v1",
                 )
@@ -305,9 +356,14 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
     prompt = format_analyst_prompt(analyst_input)
     errors = []
 
-    for provider in provider_order():
+    for provider in provider_order(analyst_input.ai_provider_order):
         try:
-            response_text = generate_with_provider(provider, prompt)
+            response_text = generate_with_provider(
+                provider,
+                prompt,
+                analyst_input.ai_api_keys,
+                analyst_input.ai_models,
+            )
             if response_text.strip():
                 return parse_generated_analysis(analyst_input.ticker, response_text)
         except (APIError, urllib.error.URLError, urllib.error.HTTPError, ValueError, Exception) as exc:
@@ -315,6 +371,38 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
             continue
 
     return local_analysis(analyst_input)
+
+
+def test_provider_key(provider: str, api_key: str, model: Optional[str] = None) -> None:
+    normalized_provider = provider.strip().lower()
+    selected_model = model or get_provider_model(normalized_provider)
+    prompt = (
+        "Jawab hanya dengan kata OK. Ini adalah tes koneksi API untuk AstroCycle."
+    )
+
+    if normalized_provider == "openai":
+        call_openai_compatible(api_key=api_key, model=selected_model, prompt=prompt)
+        return
+    if normalized_provider == "gemini":
+        call_gemini(api_key=api_key, model=selected_model, prompt=prompt)
+        return
+    if normalized_provider in {"deepseek", "deepseek-ai"}:
+        call_openai_compatible(
+            api_key=api_key,
+            model=selected_model,
+            prompt=prompt,
+            base_url="https://api.deepseek.com",
+        )
+        return
+    if normalized_provider in {"xai", "grok"}:
+        call_openai_compatible(
+            api_key=api_key,
+            model=selected_model,
+            prompt=prompt,
+            base_url="https://api.x.ai/v1",
+        )
+        return
+    raise ValueError(f"Provider AI tidak dikenal: {provider}")
 
 
 def parse_analysis_response(response_text: str) -> Dict[str, str]:

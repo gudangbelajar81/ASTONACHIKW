@@ -14,6 +14,9 @@ export default function Sidebar() {
           <Link href="/login" className="nav-link">
             Akun
           </Link>
+          <Link href="/settings" className="nav-link">
+            Settings
+          </Link>
           <Link href="/" className="nav-link">
             Beranda
           </Link>
