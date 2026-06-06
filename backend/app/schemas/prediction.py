@@ -40,10 +40,22 @@ class PredictionSnapshotRead(BaseModel):
     realized_return: float | None
 
 
+class ModelWeightResponse(BaseModel):
+    ticker: str
+    horizon_days: int
+    weights: dict[str, float]
+    sample_count: int
+    hit_rate: float
+    average_signal_return: float
+    method: str
+    trained_at: str | None = None
+
+
 class PerformanceResponse(BaseModel):
     ticker: str
     horizon_days: int
     backtest: BacktestMetrics
     latest_prediction: PredictionResponse
+    model_weights: ModelWeightResponse
     snapshots: list[PredictionSnapshotRead]
     verdict: str

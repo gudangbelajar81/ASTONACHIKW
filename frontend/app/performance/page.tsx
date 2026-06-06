@@ -25,6 +25,14 @@ type PerformanceReport = {
     risk_label: string;
     as_of_date: string;
   };
+  model_weights: {
+    weights: Record<string, number>;
+    sample_count: number;
+    hit_rate: number;
+    average_signal_return: number;
+    method: string;
+    trained_at: string | null;
+  };
   snapshots: {
     as_of_date: string;
     signal: string;
@@ -45,6 +53,7 @@ export default function PerformancePage() {
   const [ticker, setTicker] = useState("AAPL");
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [training, setTraining] = useState(false);
   const [error, setError] = useState("");
 
   async function loadReport(nextTicker: string) {
@@ -62,6 +71,25 @@ export default function PerformancePage() {
       setError(exc instanceof Error ? exc.message : "Gagal mengambil performance report.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function trainWeights() {
+    setTraining(true);
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/model-weights/${encodeURIComponent(ticker)}/train?horizon_days=30`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
+      }
+      await loadReport(ticker);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : "Gagal melatih ulang bobot model.");
+    } finally {
+      setTraining(false);
     }
   }
 
@@ -140,6 +168,29 @@ export default function PerformancePage() {
                 <p>
                   Risiko <strong>{report.latest_prediction.risk_label}</strong>
                 </p>
+              </article>
+
+              <article className="performance-card">
+                <div className="performance-card__topline">
+                  <h3>Bobot Model</h3>
+                  <button type="button" onClick={trainWeights} disabled={training || loading}>
+                    {training ? "Melatih..." : "Latih Ulang"}
+                  </button>
+                </div>
+                <p>
+                  Method <strong>{report.model_weights.method}</strong>
+                </p>
+                <p>
+                  Hit rate training <strong>{formatPercent(report.model_weights.hit_rate)}</strong>
+                </p>
+                <div className="weight-list">
+                  {Object.entries(report.model_weights.weights).map(([name, weight]) => (
+                    <div key={name}>
+                      <span>{name.replaceAll("_", " ")}</span>
+                      <strong>{formatPercent(weight)}</strong>
+                    </div>
+                  ))}
+                </div>
               </article>
 
               <article className="performance-card">

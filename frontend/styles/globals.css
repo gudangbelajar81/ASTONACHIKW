@@ -381,7 +381,7 @@ a {
 
 .performance-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -394,6 +394,44 @@ a {
   justify-content: space-between;
   gap: 16px;
   margin: 10px 0;
+}
+
+.performance-card__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.performance-card__topline button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #38bdf8;
+  color: #04111f;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.performance-card__topline button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.weight-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.weight-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  color: #cbd5e1;
+  text-transform: capitalize;
 }
 
 .snapshot-table {

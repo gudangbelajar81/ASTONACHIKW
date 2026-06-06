@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from backend.app.db.base import Base
 
@@ -85,4 +85,21 @@ class PredictionSnapshot(Base):
 
     __table_args__ = (
         UniqueConstraint("symbol", "as_of_date", "horizon_days", name="uq_prediction_symbol_date_horizon"),
+    )
+
+
+class ModelWeightProfile(Base):
+    __tablename__ = "model_weight_profiles"
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String(20), nullable=False, index=True)
+    horizon_days = Column(Integer, nullable=False)
+    weights = Column(JSON, nullable=False)
+    sample_count = Column(Integer, nullable=False)
+    hit_rate = Column(Float, nullable=False)
+    average_signal_return = Column(Float, nullable=False)
+    method = Column(String(50), nullable=False, default="correlation_learning")
+    trained_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "horizon_days", name="uq_weight_profile_symbol_horizon"),
     )

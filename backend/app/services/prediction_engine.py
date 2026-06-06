@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.db.models import MarketPrice, PredictionSnapshot
+from backend.app.db.models import MarketPrice, ModelWeightProfile, PredictionSnapshot
 from backend.app.services.composite_engine import CycleCombination, calculate_composite_cycle
 from backend.app.services.market import fetch_market_data
 
@@ -17,9 +17,18 @@ DEFAULT_COMBINATIONS = [
     CycleCombination("Mercury", "Mars", 0.8),
 ]
 
+DEFAULT_WEIGHTS = {
+    "momentum_20": 0.26,
+    "trend_50": 0.24,
+    "astro_cycle": 0.22,
+    "volume_pressure": 0.12,
+    "volatility": 0.16,
+}
+
 
 @dataclass
 class Factor:
+    key: str
     name: str
     value: float
     weight: float
@@ -92,7 +101,15 @@ async def latest_composite_value(session: AsyncSession, as_of_date: date) -> flo
     return float(composite[-1]["value"])
 
 
-def score_from_frame(df: pd.DataFrame, composite_value: float) -> tuple[list[Factor], float, float, str, str, str]:
+def normalize_weights(raw_weights: dict[str, float]) -> dict[str, float]:
+    cleaned = {key: max(0.0, float(raw_weights.get(key, 0))) for key in DEFAULT_WEIGHTS}
+    total = sum(cleaned.values())
+    if total <= 0:
+        return DEFAULT_WEIGHTS.copy()
+    return {key: value / total for key, value in cleaned.items()}
+
+
+def extract_factor_values(df: pd.DataFrame, composite_value: float) -> dict[str, float]:
     close = df["close"].astype(float)
     volume = df["volume"].astype(float)
     returns = close.pct_change().fillna(0)
@@ -108,12 +125,32 @@ def score_from_frame(df: pd.DataFrame, composite_value: float) -> tuple[list[Fac
         else 0
     )
 
+    return {
+        "momentum_20": clamp(momentum_20 * 8),
+        "trend_50": clamp(trend_50 * 10),
+        "astro_cycle": clamp(composite_value),
+        "volume_pressure": clamp(volume_ratio),
+        "volatility": clamp(-volatility_20 * 12),
+    }
+
+
+def score_from_frame(
+    df: pd.DataFrame,
+    composite_value: float,
+    weights: dict[str, float] | None = None,
+) -> tuple[list[Factor], float, float, str, str, str]:
+    close = df["close"].astype(float)
+    returns = close.pct_change().fillna(0)
+    volatility_20 = float(returns.rolling(20, min_periods=5).std().iloc[-1] or 0)
+    selected_weights = normalize_weights(weights or DEFAULT_WEIGHTS)
+    values = extract_factor_values(df, composite_value)
+
     factors = [
-        Factor("Momentum 20 Hari", clamp(momentum_20 * 8), 0.26, "Perubahan harga 20 hari terakhir."),
-        Factor("Trend 50 Hari", clamp(trend_50 * 10), 0.24, "Posisi harga terhadap rata-rata 50 hari."),
-        Factor("Siklus Astro", clamp(composite_value), 0.22, "Nilai siklus komposit planet terbaru."),
-        Factor("Volume Pressure", clamp(volume_ratio), 0.12, "Volume terbaru dibanding rata-rata 30 hari."),
-        Factor("Volatilitas", clamp(-volatility_20 * 12), 0.16, "Volatilitas tinggi menurunkan confidence."),
+        Factor("momentum_20", "Momentum 20 Hari", values["momentum_20"], selected_weights["momentum_20"], "Perubahan harga 20 hari terakhir."),
+        Factor("trend_50", "Trend 50 Hari", values["trend_50"], selected_weights["trend_50"], "Posisi harga terhadap rata-rata 50 hari."),
+        Factor("astro_cycle", "Siklus Astro", values["astro_cycle"], selected_weights["astro_cycle"], "Nilai siklus komposit planet terbaru."),
+        Factor("volume_pressure", "Volume Pressure", values["volume_pressure"], selected_weights["volume_pressure"], "Volume terbaru dibanding rata-rata 30 hari."),
+        Factor("volatility", "Volatilitas", values["volatility"], selected_weights["volatility"], "Volatilitas tinggi menurunkan confidence."),
     ]
 
     score = sum(factor.contribution for factor in factors)
@@ -139,7 +176,7 @@ def score_from_frame(df: pd.DataFrame, composite_value: float) -> tuple[list[Fac
     return factors, probability_up, expected_return, signal, confidence, risk_label
 
 
-def backtest_frame(df: pd.DataFrame, horizon_days: int) -> dict[str, float | int]:
+def backtest_frame(df: pd.DataFrame, horizon_days: int, weights: dict[str, float] | None = None) -> dict[str, float | int]:
     if len(df) < 90 + horizon_days:
         return {
             "sample_count": 0,
@@ -159,7 +196,7 @@ def backtest_frame(df: pd.DataFrame, horizon_days: int) -> dict[str, float | int
             "close": closes.iloc[: idx + 1],
             "volume": df["volume"].astype(float).iloc[: idx + 1],
         })
-        factors, probability_up, _, signal, _, _ = score_from_frame(window, 0.0)
+        factors, probability_up, _, signal, _, _ = score_from_frame(window, 0.0, weights)
         forward_return = float(closes.iloc[idx + horizon_days] / closes.iloc[idx] - 1)
         direction = 1 if signal != "bearish" else -1
         signal_return = direction * forward_return
@@ -180,18 +217,120 @@ def backtest_frame(df: pd.DataFrame, horizon_days: int) -> dict[str, float | int
     }
 
 
+async def get_weight_profile(
+    session: AsyncSession,
+    symbol: str,
+    horizon_days: int,
+) -> ModelWeightProfile | None:
+    result = await session.execute(
+        select(ModelWeightProfile)
+        .where(ModelWeightProfile.symbol == symbol.upper())
+        .where(ModelWeightProfile.horizon_days == horizon_days)
+    )
+    return result.scalar_one_or_none()
+
+
+def learn_weights_from_frame(df: pd.DataFrame, horizon_days: int) -> tuple[dict[str, float], dict[str, float | int]]:
+    if len(df) < 120 + horizon_days:
+        metrics = backtest_frame(df, horizon_days, DEFAULT_WEIGHTS)
+        return DEFAULT_WEIGHTS.copy(), metrics
+
+    rows = []
+    closes = df["close"].astype(float).reset_index(drop=True)
+    for idx in range(60, len(df) - horizon_days):
+        window = df.iloc[: idx + 1].reset_index(drop=True)
+        factor_values = extract_factor_values(window, 0.0)
+        forward_return = float(closes.iloc[idx + horizon_days] / closes.iloc[idx] - 1)
+        rows.append({**factor_values, "forward_return": forward_return})
+
+    learn_df = pd.DataFrame(rows)
+    raw_weights = {}
+    for key in DEFAULT_WEIGHTS:
+        correlation = learn_df[key].corr(learn_df["forward_return"])
+        if pd.isna(correlation):
+            correlation = 0.0
+        raw_weights[key] = abs(float(correlation)) + 0.03
+
+    learned_weights = normalize_weights(raw_weights)
+    learned_metrics = backtest_frame(df, horizon_days, learned_weights)
+    default_metrics = backtest_frame(df, horizon_days, DEFAULT_WEIGHTS)
+
+    if float(default_metrics["average_signal_return"]) > float(learned_metrics["average_signal_return"]):
+        return DEFAULT_WEIGHTS.copy(), default_metrics
+    return learned_weights, learned_metrics
+
+
+async def train_weight_profile(session: AsyncSession, ticker: str, horizon_days: int = 30) -> dict:
+    symbol = ticker.upper()
+    df = await load_price_frame(session, symbol, lookback_days=720)
+    weights, metrics = learn_weights_from_frame(df, horizon_days)
+
+    profile = await get_weight_profile(session, symbol, horizon_days)
+    if profile:
+        profile.weights = weights
+        profile.sample_count = int(metrics["sample_count"])
+        profile.hit_rate = float(metrics["hit_rate"])
+        profile.average_signal_return = float(metrics["average_signal_return"])
+        profile.method = "correlation_learning"
+    else:
+        profile = ModelWeightProfile(
+            symbol=symbol,
+            horizon_days=horizon_days,
+            weights=weights,
+            sample_count=int(metrics["sample_count"]),
+            hit_rate=float(metrics["hit_rate"]),
+            average_signal_return=float(metrics["average_signal_return"]),
+            method="correlation_learning",
+        )
+        session.add(profile)
+
+    await session.commit()
+    await session.refresh(profile)
+    return profile_to_dict(profile)
+
+
+def profile_to_dict(profile: ModelWeightProfile | None, ticker: str | None = None, horizon_days: int = 30) -> dict:
+    if profile is None:
+        return {
+            "ticker": (ticker or "").upper(),
+            "horizon_days": horizon_days,
+            "weights": DEFAULT_WEIGHTS.copy(),
+            "sample_count": 0,
+            "hit_rate": 0.0,
+            "average_signal_return": 0.0,
+            "method": "default",
+            "trained_at": None,
+        }
+    return {
+        "ticker": profile.symbol,
+        "horizon_days": profile.horizon_days,
+        "weights": profile.weights,
+        "sample_count": profile.sample_count,
+        "hit_rate": profile.hit_rate,
+        "average_signal_return": profile.average_signal_return,
+        "method": profile.method,
+        "trained_at": profile.trained_at.isoformat() if profile.trained_at else None,
+    }
+
+
 async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int = 30) -> dict:
+    symbol = ticker.upper()
     df = await load_price_frame(session, ticker)
     if df.empty or len(df) < 30:
         raise ValueError("Data harga belum cukup untuk membuat prediksi.")
 
     as_of_date = df.iloc[-1]["date"]
     composite_value = await latest_composite_value(session, as_of_date)
-    factors, probability_up, expected_return, signal, confidence, risk_label = score_from_frame(df, composite_value)
-    backtest = backtest_frame(df, horizon_days)
+    profile = await get_weight_profile(session, symbol, horizon_days)
+    if profile is None:
+        await train_weight_profile(session, symbol, horizon_days)
+        profile = await get_weight_profile(session, symbol, horizon_days)
+    active_weights = profile.weights if profile else DEFAULT_WEIGHTS
+    factors, probability_up, expected_return, signal, confidence, risk_label = score_from_frame(df, composite_value, active_weights)
+    backtest = backtest_frame(df, horizon_days, active_weights)
 
     snapshot = PredictionSnapshot(
-        symbol=ticker.upper(),
+        symbol=symbol,
         as_of_date=as_of_date,
         horizon_days=horizon_days,
         score=sum(factor.contribution for factor in factors),
@@ -207,7 +346,7 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
         await session.rollback()
 
     return {
-        "ticker": ticker.upper(),
+        "ticker": symbol,
         "as_of_date": as_of_date.isoformat(),
         "horizon_days": horizon_days,
         "signal": signal,
@@ -235,8 +374,9 @@ async def build_performance_report(session: AsyncSession, ticker: str, horizon_d
     if df.empty or len(df) < 90:
         raise ValueError("Data harga belum cukup untuk performance report.")
 
+    model_weights = await train_weight_profile(session, symbol, horizon_days)
     latest_prediction = await build_prediction(session, symbol, horizon_days)
-    backtest = backtest_frame(df, horizon_days)
+    backtest = backtest_frame(df, horizon_days, model_weights["weights"])
 
     snapshot_result = await session.execute(
         select(PredictionSnapshot)
@@ -290,6 +430,7 @@ async def build_performance_report(session: AsyncSession, ticker: str, horizon_d
         "horizon_days": horizon_days,
         "backtest": backtest,
         "latest_prediction": latest_prediction,
+        "model_weights": model_weights,
         "snapshots": snapshot_rows,
         "verdict": verdict,
     }
