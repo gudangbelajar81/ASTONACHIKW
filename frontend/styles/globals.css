@@ -369,6 +369,39 @@ a {
   line-height: 1.5;
 }
 
+.context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.context-grid div {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.42);
+  border: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.context-grid span {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.context-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: #f8fafc;
+  text-transform: uppercase;
+}
+
+.context-grid p {
+  margin: 8px 0 0;
+  color: #cbd5e1;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
 .prediction-factors {
   display: grid;
   gap: 8px;
@@ -945,7 +978,8 @@ a {
   }
   .metric-row,
   .insight-grid,
-  .prediction-metrics {
+  .prediction-metrics,
+  .context-grid {
     grid-template-columns: 1fr;
   }
   .ai-panel {

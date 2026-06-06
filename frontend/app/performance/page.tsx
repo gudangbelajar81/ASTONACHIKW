@@ -32,6 +32,21 @@ type PerformanceReport = {
       risk_multiplier: number;
       description: string;
     };
+    sentiment?: {
+      label: string;
+      score: number;
+      headline_count: number;
+      description: string;
+    } | null;
+    macro?: {
+      benchmark: string;
+      beta: number;
+      correlation: number;
+      relative_strength: number;
+      market_regime: string;
+      risk_budget: string;
+      description: string;
+    } | null;
   };
   model_weights: {
     weights: Record<string, number>;
@@ -182,6 +197,18 @@ export default function PerformancePage() {
                     <strong>{report.latest_prediction.regime.label}</strong>
                   </div>
                   <p>{report.latest_prediction.regime.description}</p>
+                </div>
+                <div className="context-grid">
+                  <div>
+                    <span>Sentimen</span>
+                    <strong>{report.latest_prediction.sentiment?.label ?? "netral"}</strong>
+                    <p>{report.latest_prediction.sentiment?.description ?? "Belum ada headline kuat."}</p>
+                  </div>
+                  <div>
+                    <span>Macro Risk</span>
+                    <strong>{report.latest_prediction.macro?.risk_budget ?? "normal"}</strong>
+                    <p>{report.latest_prediction.macro?.description ?? "Konteks benchmark belum tersedia."}</p>
+                  </div>
                 </div>
               </article>
 

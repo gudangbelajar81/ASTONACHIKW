@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.db.models import MarketPrice, ModelWeightProfile, PredictionSnapshot
 from backend.app.services.composite_engine import CycleCombination, calculate_composite_cycle
+from backend.app.services.context_engine import build_macro_context, build_sentiment_context
 from backend.app.services.market import fetch_market_data
 
 
@@ -385,6 +386,15 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
     factors, probability_up, expected_return, signal, confidence, risk_label = score_from_frame(df, composite_value, active_weights)
     backtest = backtest_frame(df, horizon_days, active_weights)
     regime = detect_regime(df)
+    sentiment = await build_sentiment_context(symbol)
+    macro = await build_macro_context(session, symbol)
+
+    expected_return += float(sentiment["score"]) * 0.015
+    if macro["risk_budget"] == "defensif":
+        expected_return *= 0.75
+        risk_label = "tinggi" if risk_label != "tinggi" else risk_label
+    elif macro["risk_budget"] == "agresif-terukur":
+        expected_return *= 1.08
 
     snapshot = PredictionSnapshot(
         symbol=symbol,
@@ -412,6 +422,8 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
         "expected_return": expected_return,
         "risk_label": risk_label,
         "regime": regime,
+        "sentiment": sentiment,
+        "macro": macro,
         "factors": [
             {
                 "name": factor.name,

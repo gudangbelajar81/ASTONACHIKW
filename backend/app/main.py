@@ -8,6 +8,7 @@ from backend.app.api.scanner import router as scanner_router
 from backend.app.api.turning_points import router as turning_points_router
 from backend.app.api.analyst import router as analyst_router
 from backend.app.api.predictions import router as predictions_router
+from backend.app.api.context import router as context_router
 from backend.app.core.config import settings
 
 frontend_origins = [origin.strip() for origin in settings.FRONTEND_URL.split(",") if origin.strip()]
@@ -35,6 +36,7 @@ app.include_router(scanner_router, prefix="/api")
 app.include_router(turning_points_router, prefix="/api")
 app.include_router(analyst_router, prefix="/api")
 app.include_router(predictions_router, prefix="/api")
+app.include_router(context_router, prefix="/api")
 
 
 @app.get("/")

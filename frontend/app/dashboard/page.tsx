@@ -49,6 +49,21 @@ type PredictionResponse = {
     risk_multiplier: number;
     description: string;
   };
+  sentiment?: {
+    label: string;
+    score: number;
+    headline_count: number;
+    description: string;
+  } | null;
+  macro?: {
+    benchmark: string;
+    beta: number;
+    correlation: number;
+    relative_strength: number;
+    market_regime: string;
+    risk_budget: string;
+    description: string;
+  } | null;
   factors: PredictionFactor[];
   backtest: {
     sample_count: number;
@@ -375,6 +390,19 @@ export default function DashboardPage() {
                       <strong>{data.prediction.regime.label}</strong>
                     </div>
                     <p>{data.prediction.regime.description}</p>
+                  </div>
+
+                  <div className="context-grid">
+                    <div>
+                      <span>Sentimen News</span>
+                      <strong>{data.prediction.sentiment?.label ?? "netral"}</strong>
+                      <p>{data.prediction.sentiment?.description ?? "Belum ada headline yang cukup kuat."}</p>
+                    </div>
+                    <div>
+                      <span>Macro Risk</span>
+                      <strong>{data.prediction.macro?.risk_budget ?? "normal"}</strong>
+                      <p>{data.prediction.macro?.description ?? "Konteks benchmark belum tersedia."}</p>
+                    </div>
                   </div>
 
                   <div className="prediction-backtest">

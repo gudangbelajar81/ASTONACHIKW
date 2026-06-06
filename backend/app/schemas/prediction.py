@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from backend.app.schemas.context import MacroContextResponse, SentimentResponse
 
 
 class PredictionFactor(BaseModel):
@@ -36,6 +37,8 @@ class PredictionResponse(BaseModel):
     expected_return: float
     risk_label: str
     regime: RegimeInfo
+    sentiment: SentimentResponse | None = None
+    macro: MacroContextResponse | None = None
     factors: list[PredictionFactor]
     backtest: BacktestMetrics
 
