@@ -5,7 +5,7 @@ import pandas as pd
 import yfinance as yf
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.services.market import fetch_market_data
+from backend.app.services.market import configure_yfinance_cache, fetch_market_data
 
 POSITIVE_TERMS = {
     "beat",
@@ -115,6 +115,7 @@ def extract_news_items(raw_news: list[dict[str, Any]], limit: int = 8) -> list[d
 async def build_sentiment_context(ticker: str) -> dict[str, Any]:
     symbol = ticker.upper()
     try:
+        configure_yfinance_cache()
         news = yf.Ticker(symbol).news or []
     except Exception:
         news = []

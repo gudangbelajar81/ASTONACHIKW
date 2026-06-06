@@ -233,6 +233,62 @@ def score_from_frame(
     return factors, probability_up, expected_return, signal, confidence, risk_label
 
 
+def build_scenario_plan(
+    df: pd.DataFrame,
+    signal: str,
+    expected_return: float,
+    risk_label: str,
+    risk_budget: str,
+    account_equity: float = 10000,
+    risk_pct: float = 1.0,
+) -> dict:
+    close = df["close"].astype(float)
+    high = df["high"].astype(float)
+    low = df["low"].astype(float)
+    latest_close = float(close.iloc[-1])
+    true_range = pd.concat(
+        [
+            high - low,
+            (high - close.shift(1)).abs(),
+            (low - close.shift(1)).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    atr_14 = float(true_range.rolling(14, min_periods=5).mean().iloc[-1] or latest_close * 0.03)
+    budget_multiplier = 0.6 if risk_budget == "defensif" else 1.1 if risk_budget == "agresif-terukur" else 0.85
+    risk_amount = account_equity * (risk_pct / 100) * budget_multiplier
+    stop_distance = max(atr_14 * (1.2 if risk_label == "tinggi" else 1.0), latest_close * 0.015)
+
+    if signal == "bearish":
+        entry_low = latest_close - atr_14 * 0.15
+        entry_high = latest_close + atr_14 * 0.25
+        invalidation = latest_close + stop_distance
+        bullish_target = latest_close + abs(expected_return) * latest_close
+        bearish_target = latest_close - max(abs(expected_return) * latest_close, atr_14 * 1.8)
+        playbook = "Bias bearish. Prioritaskan sell rally atau hindari entry long sampai harga kembali melewati invalidation."
+    else:
+        entry_low = latest_close - atr_14 * 0.35
+        entry_high = latest_close + atr_14 * 0.15
+        invalidation = latest_close - stop_distance
+        bullish_target = latest_close + max(abs(expected_return) * latest_close, atr_14 * 1.8)
+        bearish_target = latest_close - abs(expected_return) * latest_close
+        playbook = "Bias konstruktif. Entry terbaik berada dekat entry zone dengan stop disiplin di invalidation."
+
+    risk_per_share = abs(latest_close - invalidation)
+    position_size = int(risk_amount / risk_per_share) if risk_per_share > 0 else 0
+    return {
+        "entry_zone_low": round(entry_low, 2),
+        "entry_zone_high": round(entry_high, 2),
+        "invalidation_level": round(invalidation, 2),
+        "bullish_target": round(bullish_target, 2),
+        "bearish_target": round(bearish_target, 2),
+        "position_size_shares": max(position_size, 0),
+        "risk_amount": round(risk_amount, 2),
+        "risk_per_share": round(risk_per_share, 2),
+        "playbook": playbook,
+    }
+
+
 def backtest_frame(df: pd.DataFrame, horizon_days: int, weights: dict[str, float] | None = None) -> dict[str, float | int]:
     if len(df) < 90 + horizon_days:
         return {
@@ -370,7 +426,13 @@ def profile_to_dict(profile: ModelWeightProfile | None, ticker: str | None = Non
     }
 
 
-async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int = 30) -> dict:
+async def build_prediction(
+    session: AsyncSession,
+    ticker: str,
+    horizon_days: int = 30,
+    account_equity: float = 10000,
+    risk_pct: float = 1.0,
+) -> dict:
     symbol = ticker.upper()
     df = await load_price_frame(session, ticker)
     if df.empty or len(df) < 30:
@@ -395,6 +457,7 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
         risk_label = "tinggi" if risk_label != "tinggi" else risk_label
     elif macro["risk_budget"] == "agresif-terukur":
         expected_return *= 1.08
+    scenario = build_scenario_plan(df, signal, expected_return, risk_label, str(macro["risk_budget"]), account_equity, risk_pct)
 
     snapshot = PredictionSnapshot(
         symbol=symbol,
@@ -424,6 +487,7 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
         "regime": regime,
         "sentiment": sentiment,
         "macro": macro,
+        "scenario": scenario,
         "factors": [
             {
                 "name": factor.name,
@@ -504,6 +568,41 @@ async def build_performance_report(session: AsyncSession, ticker: str, horizon_d
         "snapshots": snapshot_rows,
         "verdict": verdict,
     }
+
+
+async def build_watchlist(session: AsyncSession, tickers: list[str], horizon_days: int = 30) -> dict:
+    items = []
+    for ticker in tickers:
+        symbol = ticker.strip().upper()
+        if not symbol:
+            continue
+        try:
+            prediction = await build_prediction(session, symbol, horizon_days)
+            items.append(
+                {
+                    "ticker": symbol,
+                    "signal": prediction["signal"],
+                    "probability_up": prediction["probability_up"],
+                    "confidence": prediction["confidence"],
+                    "expected_return": prediction["expected_return"],
+                    "risk_label": prediction["risk_label"],
+                    "regime": prediction["regime"]["label"],
+                    "sentiment": prediction["sentiment"]["label"] if prediction.get("sentiment") else "netral",
+                    "risk_budget": prediction["macro"]["risk_budget"] if prediction.get("macro") else "normal",
+                }
+            )
+        except Exception:
+            continue
+
+    items.sort(
+        key=lambda item: (
+            item["expected_return"],
+            item["probability_up"],
+            -1 if item["risk_label"] == "tinggi" else 0,
+        ),
+        reverse=True,
+    )
+    return {"horizon_days": horizon_days, "items": items}
 
 
 async def get_market_rows(session: AsyncSession, symbol: str) -> list[MarketPrice]:

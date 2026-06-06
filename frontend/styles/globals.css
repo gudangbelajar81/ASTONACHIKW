@@ -192,6 +192,32 @@ a {
   opacity: 0.72;
 }
 
+.watchlist-form {
+  display: flex;
+  gap: 10px;
+  min-width: min(520px, 100%);
+}
+
+.watchlist-form input {
+  flex: 1;
+  padding: 0.78rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.95);
+  color: #f8fafc;
+}
+
+.watchlist-form button {
+  min-width: 92px;
+  padding: 0.82rem 1rem;
+  border-radius: 8px;
+  border: 0;
+  background: #38bdf8;
+  color: #04111f;
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .dashboard-alert {
   padding: 12px 14px;
   margin-bottom: 16px;
@@ -402,6 +428,38 @@ a {
   font-size: 0.9rem;
 }
 
+.scenario-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.16);
+}
+
+.scenario-panel div {
+  display: grid;
+  gap: 4px;
+}
+
+.scenario-panel span {
+  color: #bbf7d0;
+  font-size: 0.78rem;
+}
+
+.scenario-panel strong {
+  color: #f0fdf4;
+}
+
+.scenario-panel p {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: #dcfce7;
+  line-height: 1.5;
+}
+
 .prediction-factors {
   display: grid;
   gap: 8px;
@@ -514,6 +572,30 @@ a {
 
 .snapshot-table div:first-child {
   border-top: 0;
+}
+
+.watchlist-table {
+  display: grid;
+  gap: 8px;
+}
+
+.watchlist-row {
+  display: grid;
+  grid-template-columns: 0.8fr 0.9fr 1fr 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(7, 17, 36, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  color: #cbd5e1;
+}
+
+.watchlist-row--head {
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .chart-panel__topline {
@@ -973,13 +1055,22 @@ a {
   .ticker-form {
     margin-top: 16px;
   }
+  .watchlist-form {
+    display: block;
+    margin-top: 16px;
+  }
+  .watchlist-form button {
+    margin-top: 10px;
+    width: 100%;
+  }
   .ticker-form input {
     flex: 1;
   }
   .metric-row,
   .insight-grid,
   .prediction-metrics,
-  .context-grid {
+  .context-grid,
+  .scenario-panel {
     grid-template-columns: 1fr;
   }
   .ai-panel {
@@ -993,6 +1084,9 @@ a {
     display: block;
   }
   .performance-grid {
+    grid-template-columns: 1fr;
+  }
+  .watchlist-row {
     grid-template-columns: 1fr;
   }
   .settings-tabs,

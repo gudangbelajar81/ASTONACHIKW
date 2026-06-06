@@ -47,6 +47,17 @@ type PerformanceReport = {
       risk_budget: string;
       description: string;
     } | null;
+    scenario?: {
+      entry_zone_low: number;
+      entry_zone_high: number;
+      invalidation_level: number;
+      bullish_target: number;
+      bearish_target: number;
+      position_size_shares: number;
+      risk_amount: number;
+      risk_per_share: number;
+      playbook: string;
+    } | null;
   };
   model_weights: {
     weights: Record<string, number>;
@@ -210,6 +221,29 @@ export default function PerformancePage() {
                     <p>{report.latest_prediction.macro?.description ?? "Konteks benchmark belum tersedia."}</p>
                   </div>
                 </div>
+                {report.latest_prediction.scenario ? (
+                  <div className="scenario-panel">
+                    <div>
+                      <span>Entry Zone</span>
+                      <strong>
+                        {report.latest_prediction.scenario.entry_zone_low} - {report.latest_prediction.scenario.entry_zone_high}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Invalidation</span>
+                      <strong>{report.latest_prediction.scenario.invalidation_level}</strong>
+                    </div>
+                    <div>
+                      <span>Target</span>
+                      <strong>{report.latest_prediction.scenario.bullish_target}</strong>
+                    </div>
+                    <div>
+                      <span>Size</span>
+                      <strong>{report.latest_prediction.scenario.position_size_shares} saham</strong>
+                    </div>
+                    <p>{report.latest_prediction.scenario.playbook}</p>
+                  </div>
+                ) : null}
               </article>
 
               <article className="performance-card">

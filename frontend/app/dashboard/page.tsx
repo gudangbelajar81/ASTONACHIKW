@@ -64,6 +64,17 @@ type PredictionResponse = {
     risk_budget: string;
     description: string;
   } | null;
+  scenario?: {
+    entry_zone_low: number;
+    entry_zone_high: number;
+    invalidation_level: number;
+    bullish_target: number;
+    bearish_target: number;
+    position_size_shares: number;
+    risk_amount: number;
+    risk_per_share: number;
+    playbook: string;
+  } | null;
   factors: PredictionFactor[];
   backtest: {
     sample_count: number;
@@ -404,6 +415,30 @@ export default function DashboardPage() {
                       <p>{data.prediction.macro?.description ?? "Konteks benchmark belum tersedia."}</p>
                     </div>
                   </div>
+
+                  {data.prediction.scenario ? (
+                    <div className="scenario-panel">
+                      <div>
+                        <span>Entry Zone</span>
+                        <strong>
+                          {data.prediction.scenario.entry_zone_low} - {data.prediction.scenario.entry_zone_high}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Invalidation</span>
+                        <strong>{data.prediction.scenario.invalidation_level}</strong>
+                      </div>
+                      <div>
+                        <span>Target Bullish</span>
+                        <strong>{data.prediction.scenario.bullish_target}</strong>
+                      </div>
+                      <div>
+                        <span>Size</span>
+                        <strong>{data.prediction.scenario.position_size_shares} saham</strong>
+                      </div>
+                      <p>{data.prediction.scenario.playbook}</p>
+                    </div>
+                  ) : null}
 
                   <div className="prediction-backtest">
                     <span>Backtest</span>

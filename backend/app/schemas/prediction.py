@@ -27,6 +27,18 @@ class RegimeInfo(BaseModel):
     description: str
 
 
+class ScenarioPlan(BaseModel):
+    entry_zone_low: float
+    entry_zone_high: float
+    invalidation_level: float
+    bullish_target: float
+    bearish_target: float
+    position_size_shares: int
+    risk_amount: float
+    risk_per_share: float
+    playbook: str
+
+
 class PredictionResponse(BaseModel):
     ticker: str
     as_of_date: str
@@ -39,6 +51,7 @@ class PredictionResponse(BaseModel):
     regime: RegimeInfo
     sentiment: SentimentResponse | None = None
     macro: MacroContextResponse | None = None
+    scenario: ScenarioPlan | None = None
     factors: list[PredictionFactor]
     backtest: BacktestMetrics
 
@@ -72,3 +85,20 @@ class PerformanceResponse(BaseModel):
     model_weights: ModelWeightResponse
     snapshots: list[PredictionSnapshotRead]
     verdict: str
+
+
+class WatchlistItem(BaseModel):
+    ticker: str
+    signal: str
+    probability_up: float
+    confidence: str
+    expected_return: float
+    risk_label: str
+    regime: str
+    sentiment: str
+    risk_budget: str
+
+
+class WatchlistResponse(BaseModel):
+    horizon_days: int
+    items: list[WatchlistItem]

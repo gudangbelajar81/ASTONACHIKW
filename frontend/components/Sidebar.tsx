@@ -14,6 +14,9 @@ export default function Sidebar() {
           <Link href="/performance" className="nav-link">
             Performance
           </Link>
+          <Link href="/watchlist" className="nav-link">
+            Watchlist
+          </Link>
           <Link href="/login" className="nav-link">
             Akun
           </Link>

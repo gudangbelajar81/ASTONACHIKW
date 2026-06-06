@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.db.session import get_session
-from backend.app.schemas.prediction import ModelWeightResponse, PerformanceResponse, PredictionResponse
-from backend.app.services.prediction_engine import build_performance_report, build_prediction, train_weight_profile
+from backend.app.schemas.prediction import ModelWeightResponse, PerformanceResponse, PredictionResponse, WatchlistResponse
+from backend.app.services.prediction_engine import build_performance_report, build_prediction, build_watchlist, train_weight_profile
 
 router = APIRouter(tags=["predictions"])
 
@@ -12,10 +12,12 @@ router = APIRouter(tags=["predictions"])
 async def read_prediction(
     ticker: str,
     horizon_days: int = Query(default=30, ge=5, le=120),
+    account_equity: float = Query(default=10000, gt=0),
+    risk_pct: float = Query(default=1.0, gt=0, le=10),
     session: AsyncSession = Depends(get_session),
 ) -> PredictionResponse:
     try:
-        prediction = await build_prediction(session, ticker, horizon_days)
+        prediction = await build_prediction(session, ticker, horizon_days, account_equity, risk_pct)
         return PredictionResponse(**prediction)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -51,3 +53,16 @@ async def train_model_weights(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gagal melatih bobot model: {exc}")
+
+
+@router.get("/watchlist", response_model=WatchlistResponse)
+async def read_watchlist(
+    tickers: str = Query(default="AAPL,MSFT,NVDA,GOOGL,AMZN,META,TSLA"),
+    horizon_days: int = Query(default=30, ge=5, le=120),
+    session: AsyncSession = Depends(get_session),
+) -> WatchlistResponse:
+    try:
+        report = await build_watchlist(session, tickers.split(","), horizon_days)
+        return WatchlistResponse(**report)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal membaca watchlist: {exc}")
