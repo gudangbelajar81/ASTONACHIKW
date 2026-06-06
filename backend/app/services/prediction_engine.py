@@ -47,6 +47,51 @@ def sigmoid(value: float) -> float:
     return 1 / (1 + math.exp(-value))
 
 
+def detect_regime(df: pd.DataFrame) -> dict[str, float | str]:
+    close = df["close"].astype(float)
+    returns = close.pct_change().fillna(0)
+    latest_close = float(close.iloc[-1])
+    sma_50 = float(close.rolling(50, min_periods=10).mean().iloc[-1])
+    sma_200 = float(close.rolling(200, min_periods=30).mean().iloc[-1])
+    return_20 = latest_close / float(close.iloc[-21]) - 1 if len(close) > 21 else 0.0
+    return_60 = latest_close / float(close.iloc[-61]) - 1 if len(close) > 61 else return_20
+    realized_volatility = float(returns.rolling(20, min_periods=10).std().iloc[-1] or 0) * math.sqrt(252)
+
+    trend_score = clamp(((latest_close / sma_50 - 1) * 6 if sma_50 else 0) + ((latest_close / sma_200 - 1) * 4 if sma_200 else 0))
+    momentum_score = clamp((return_20 * 5) + (return_60 * 2.5))
+    volatility_score = clamp(realized_volatility / 0.45, 0, 1)
+
+    if volatility_score >= 0.78 and momentum_score < -0.15:
+        label = "risk-off"
+        risk_multiplier = 0.55
+        description = "Volatilitas tinggi dan momentum melemah. Prioritaskan proteksi risiko."
+    elif trend_score > 0.22 and momentum_score > 0.12 and volatility_score < 0.65:
+        label = "bullish"
+        risk_multiplier = 1.05
+        description = "Trend dan momentum mendukung skenario konstruktif."
+    elif trend_score < -0.22 and momentum_score < -0.12:
+        label = "bearish"
+        risk_multiplier = 0.65
+        description = "Trend dan momentum masih menekan harga."
+    elif volatility_score >= 0.72:
+        label = "high-volatility"
+        risk_multiplier = 0.70
+        description = "Volatilitas tinggi. Ukuran posisi sebaiknya lebih konservatif."
+    else:
+        label = "sideways"
+        risk_multiplier = 0.85
+        description = "Pasar relatif campuran. Tunggu konfirmasi breakout atau breakdown."
+
+    return {
+        "label": label,
+        "trend_score": trend_score,
+        "volatility_score": volatility_score,
+        "momentum_score": momentum_score,
+        "risk_multiplier": risk_multiplier,
+        "description": description,
+    }
+
+
 async def load_price_frame(session: AsyncSession, ticker: str, lookback_days: int = 420) -> pd.DataFrame:
     symbol = ticker.upper()
     query = (
@@ -153,9 +198,17 @@ def score_from_frame(
         Factor("volatility", "Volatilitas", values["volatility"], selected_weights["volatility"], "Volatilitas tinggi menurunkan confidence."),
     ]
 
+    regime = detect_regime(df)
     score = sum(factor.contribution for factor in factors)
+    if regime["label"] == "bullish":
+        score += 0.08
+    elif regime["label"] in {"bearish", "risk-off"}:
+        score -= 0.08
+    elif regime["label"] == "high-volatility":
+        score *= 0.86
+
     probability_up = sigmoid(score * 2.2)
-    expected_return = (probability_up - 0.5) * 0.16
+    expected_return = (probability_up - 0.5) * 0.16 * float(regime["risk_multiplier"])
 
     if probability_up >= 0.62:
         signal = "bullish"
@@ -172,7 +225,10 @@ def score_from_frame(
     else:
         confidence = "rendah"
 
-    risk_label = "tinggi" if volatility_20 >= 0.035 else "sedang" if volatility_20 >= 0.02 else "rendah"
+    if regime["label"] in {"risk-off", "high-volatility"}:
+        confidence = "rendah" if confidence != "tinggi" else "sedang"
+
+    risk_label = "tinggi" if regime["label"] in {"risk-off", "high-volatility"} or volatility_20 >= 0.035 else "sedang" if volatility_20 >= 0.02 else "rendah"
     return factors, probability_up, expected_return, signal, confidence, risk_label
 
 
@@ -328,6 +384,7 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
     active_weights = profile.weights if profile else DEFAULT_WEIGHTS
     factors, probability_up, expected_return, signal, confidence, risk_label = score_from_frame(df, composite_value, active_weights)
     backtest = backtest_frame(df, horizon_days, active_weights)
+    regime = detect_regime(df)
 
     snapshot = PredictionSnapshot(
         symbol=symbol,
@@ -354,6 +411,7 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
         "confidence": confidence,
         "expected_return": expected_return,
         "risk_label": risk_label,
+        "regime": regime,
         "factors": [
             {
                 "name": factor.name,

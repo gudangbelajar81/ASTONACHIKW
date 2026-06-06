@@ -17,6 +17,15 @@ class BacktestMetrics(BaseModel):
     max_drawdown: float
 
 
+class RegimeInfo(BaseModel):
+    label: str
+    trend_score: float
+    volatility_score: float
+    momentum_score: float
+    risk_multiplier: float
+    description: str
+
+
 class PredictionResponse(BaseModel):
     ticker: str
     as_of_date: str
@@ -26,6 +35,7 @@ class PredictionResponse(BaseModel):
     confidence: str
     expected_return: float
     risk_label: str
+    regime: RegimeInfo
     factors: list[PredictionFactor]
     backtest: BacktestMetrics
 

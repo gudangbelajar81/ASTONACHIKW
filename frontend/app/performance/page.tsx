@@ -24,6 +24,14 @@ type PerformanceReport = {
     expected_return: number;
     risk_label: string;
     as_of_date: string;
+    regime: {
+      label: string;
+      trend_score: number;
+      volatility_score: number;
+      momentum_score: number;
+      risk_multiplier: number;
+      description: string;
+    };
   };
   model_weights: {
     weights: Record<string, number>;
@@ -168,6 +176,13 @@ export default function PerformancePage() {
                 <p>
                   Risiko <strong>{report.latest_prediction.risk_label}</strong>
                 </p>
+                <div className="regime-strip">
+                  <div>
+                    <span>Regime</span>
+                    <strong>{report.latest_prediction.regime.label}</strong>
+                  </div>
+                  <p>{report.latest_prediction.regime.description}</p>
+                </div>
               </article>
 
               <article className="performance-card">

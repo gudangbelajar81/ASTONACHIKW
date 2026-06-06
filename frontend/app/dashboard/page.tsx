@@ -41,6 +41,14 @@ type PredictionResponse = {
   confidence: string;
   expected_return: number;
   risk_label: string;
+  regime: {
+    label: string;
+    trend_score: number;
+    volatility_score: number;
+    momentum_score: number;
+    risk_multiplier: number;
+    description: string;
+  };
   factors: PredictionFactor[];
   backtest: {
     sample_count: number;
@@ -359,6 +367,14 @@ export default function DashboardPage() {
                       <span>Risiko</span>
                       <strong>{data.prediction.risk_label}</strong>
                     </div>
+                  </div>
+
+                  <div className="regime-strip">
+                    <div>
+                      <span>Market Regime</span>
+                      <strong>{data.prediction.regime.label}</strong>
+                    </div>
+                    <p>{data.prediction.regime.description}</p>
                   </div>
 
                   <div className="prediction-backtest">
