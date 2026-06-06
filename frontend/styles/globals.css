@@ -598,6 +598,65 @@ a {
   text-transform: uppercase;
 }
 
+.ohlcv-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.ohlcv-chart-panel,
+.bandar-panel {
+  border-radius: 8px;
+  background: rgba(7, 17, 36, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.ohlcv-chart-panel,
+.bandar-panel {
+  padding: 18px;
+}
+
+.ohlcv-chart,
+.ohlcv-volume {
+  width: 100%;
+}
+
+.bandar-panel h2 {
+  margin: 0 0 12px;
+}
+
+.bandar-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.bandar-metrics div {
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.bandar-metrics span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+.bandar-metrics strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.bandar-panel ul {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
 .chart-panel__topline {
   display: flex;
   align-items: flex-start;
@@ -1165,6 +1224,10 @@ a {
     grid-template-columns: 1fr;
   }
   .watchlist-row {
+    grid-template-columns: 1fr;
+  }
+  .ohlcv-layout,
+  .bandar-metrics {
     grid-template-columns: 1fr;
   }
   .settings-tabs,

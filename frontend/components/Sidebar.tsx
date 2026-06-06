@@ -17,6 +17,9 @@ export default function Sidebar() {
           <Link href="/watchlist" className="nav-link">
             Watchlist
           </Link>
+          <Link href="/ohlcv" className="nav-link">
+            OHLCV Pro
+          </Link>
           <Link href="/login" className="nav-link">
             Akun
           </Link>
