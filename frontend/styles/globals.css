@@ -348,6 +348,72 @@ a {
   border-top: 1px solid rgba(148, 163, 184, 0.08);
 }
 
+.performance-page {
+  display: grid;
+  gap: 14px;
+}
+
+.performance-verdict,
+.performance-card {
+  border-radius: 8px;
+  background: rgba(7, 17, 36, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.performance-verdict {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px;
+}
+
+.performance-verdict h2,
+.performance-card h3 {
+  margin: 0;
+}
+
+.performance-verdict p,
+.performance-card p {
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.performance-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
+}
+
+.performance-card {
+  padding: 16px;
+}
+
+.performance-card p {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 10px 0;
+}
+
+.snapshot-table {
+  display: grid;
+  gap: 8px;
+}
+
+.snapshot-table div {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  color: #cbd5e1;
+}
+
+.snapshot-table div:first-child {
+  border-top: 0;
+}
+
 .chart-panel__topline {
   display: flex;
   align-items: flex-start;
@@ -819,8 +885,12 @@ a {
   .settings-layout,
   .api-center__topline,
   .api-key-row,
-  .api-edit-panel {
+  .api-edit-panel,
+  .performance-verdict {
     display: block;
+  }
+  .performance-grid {
+    grid-template-columns: 1fr;
   }
   .settings-tabs,
   .api-key-row button,

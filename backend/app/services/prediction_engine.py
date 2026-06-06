@@ -227,3 +227,78 @@ async def build_prediction(session: AsyncSession, ticker: str, horizon_days: int
         ],
         "backtest": backtest,
     }
+
+
+async def build_performance_report(session: AsyncSession, ticker: str, horizon_days: int = 30) -> dict:
+    symbol = ticker.upper()
+    df = await load_price_frame(session, symbol, lookback_days=720)
+    if df.empty or len(df) < 90:
+        raise ValueError("Data harga belum cukup untuk performance report.")
+
+    latest_prediction = await build_prediction(session, symbol, horizon_days)
+    backtest = backtest_frame(df, horizon_days)
+
+    snapshot_result = await session.execute(
+        select(PredictionSnapshot)
+        .where(PredictionSnapshot.symbol == symbol)
+        .where(PredictionSnapshot.horizon_days == horizon_days)
+        .order_by(PredictionSnapshot.as_of_date.desc())
+        .limit(20)
+    )
+    snapshots = snapshot_result.scalars().all()
+
+    close_by_date = {row.date: float(row.close) for row in await get_market_rows(session, symbol)}
+    snapshot_rows = []
+    for snapshot in snapshots:
+        realized_return = snapshot.realized_return
+        target_date = snapshot.as_of_date + timedelta(days=horizon_days)
+        if realized_return is None and snapshot.as_of_date in close_by_date:
+            future_dates = [item_date for item_date in close_by_date if item_date >= target_date]
+            if future_dates:
+                future_date = min(future_dates)
+                realized_return = close_by_date[future_date] / close_by_date[snapshot.as_of_date] - 1
+                snapshot.realized_return = realized_return
+
+        snapshot_rows.append(
+            {
+                "as_of_date": snapshot.as_of_date.isoformat(),
+                "horizon_days": snapshot.horizon_days,
+                "signal": snapshot.signal,
+                "probability_up": snapshot.probability_up,
+                "confidence": snapshot.confidence,
+                "expected_return": snapshot.expected_return,
+                "realized_return": realized_return,
+            }
+        )
+
+    if snapshots:
+        await session.commit()
+
+    hit_rate = float(backtest["hit_rate"])
+    sample_count = int(backtest["sample_count"])
+    if sample_count < 30:
+        verdict = "Data historis belum cukup untuk menilai kualitas model."
+    elif hit_rate >= 0.58:
+        verdict = "Model terlihat konstruktif pada backtest awal, tetapi tetap perlu validasi forward."
+    elif hit_rate >= 0.50:
+        verdict = "Model cukup netral; gunakan sebagai filter pendukung, bukan sinyal tunggal."
+    else:
+        verdict = "Model belum stabil untuk ticker ini; bobot faktor perlu dievaluasi ulang."
+
+    return {
+        "ticker": symbol,
+        "horizon_days": horizon_days,
+        "backtest": backtest,
+        "latest_prediction": latest_prediction,
+        "snapshots": snapshot_rows,
+        "verdict": verdict,
+    }
+
+
+async def get_market_rows(session: AsyncSession, symbol: str) -> list[MarketPrice]:
+    result = await session.execute(
+        select(MarketPrice)
+        .where(MarketPrice.symbol == symbol)
+        .order_by(MarketPrice.date)
+    )
+    return list(result.scalars().all())

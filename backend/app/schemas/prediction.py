@@ -28,3 +28,22 @@ class PredictionResponse(BaseModel):
     risk_label: str
     factors: list[PredictionFactor]
     backtest: BacktestMetrics
+
+
+class PredictionSnapshotRead(BaseModel):
+    as_of_date: str
+    horizon_days: int
+    signal: str
+    probability_up: float
+    confidence: str
+    expected_return: float | None
+    realized_return: float | None
+
+
+class PerformanceResponse(BaseModel):
+    ticker: str
+    horizon_days: int
+    backtest: BacktestMetrics
+    latest_prediction: PredictionResponse
+    snapshots: list[PredictionSnapshotRead]
+    verdict: str
