@@ -41,7 +41,8 @@ def get_body_longitude(body_name: str, target_date: date) -> float:
     dt = datetime(target_date.year, target_date.month, target_date.day, 0, 0)
     jd = swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute / 60)
     position = swe.calc_ut(jd, PLANET_CODES[body_name])
-    return float(position[0])
+    coordinates = position[0]
+    return float(coordinates[0])
 
 
 def daily_planetary_positions(start_date: date, end_date: date) -> list[dict[str, Any]]:
