@@ -67,3 +67,22 @@ class CycleCandidate(Base):
     body_b = Column(String(50), nullable=False)
     score = Column(Float, nullable=True)
     details = Column(Text, nullable=True)
+
+
+class PredictionSnapshot(Base):
+    __tablename__ = "prediction_snapshots"
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String(20), nullable=False, index=True)
+    as_of_date = Column(Date, nullable=False, index=True)
+    horizon_days = Column(Integer, nullable=False)
+    score = Column(Float, nullable=False)
+    probability_up = Column(Float, nullable=False)
+    confidence = Column(String(20), nullable=False)
+    signal = Column(String(20), nullable=False)
+    expected_return = Column(Float, nullable=True)
+    realized_return = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "as_of_date", "horizon_days", name="uq_prediction_symbol_date_horizon"),
+    )

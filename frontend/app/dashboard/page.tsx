@@ -24,11 +24,39 @@ type TurningPointsResponse = {
   total_detected: number;
 };
 
+type PredictionFactor = {
+  name: string;
+  value: number;
+  weight: number;
+  contribution: number;
+  description: string;
+};
+
+type PredictionResponse = {
+  ticker: string;
+  as_of_date: string;
+  horizon_days: number;
+  signal: string;
+  probability_up: number;
+  confidence: string;
+  expected_return: number;
+  risk_label: string;
+  factors: PredictionFactor[];
+  backtest: {
+    sample_count: number;
+    hit_rate: number;
+    average_forward_return: number;
+    average_signal_return: number;
+    max_drawdown: number;
+  };
+};
+
 type DashboardData = {
   composite: CompositePoint[];
   scanner: ScannerResult[];
   turningPoints: TurningPoint[];
   analysis: AnalystSummary | null;
+  prediction: PredictionResponse | null;
 };
 
 function getApiBaseUrl() {
@@ -50,6 +78,10 @@ const defaultCombinations = [
 
 function formatDate(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function buildRange() {
@@ -88,6 +120,7 @@ export default function DashboardPage() {
     scanner: [],
     turningPoints: [],
     analysis: null,
+    prediction: null,
   });
   const [loading, setLoading] = useState(true);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -138,11 +171,15 @@ export default function DashboardPage() {
       const turningPointsPromise = readJson<TurningPointsResponse>(
         `${API_BASE_URL}/api/turning-points?ticker=${encodeURIComponent(nextTicker)}&lookback_days=180`
       );
+      const predictionPromise = readJson<PredictionResponse>(
+        `${API_BASE_URL}/api/predictions/${encodeURIComponent(nextTicker)}?horizon_days=30`
+      );
 
-      const [compositeResult, scannerResult, turningPointsResult] = await Promise.allSettled([
+      const [compositeResult, scannerResult, turningPointsResult, predictionResult] = await Promise.allSettled([
         compositePromise,
         scannerPromise,
         turningPointsPromise,
+        predictionPromise,
       ]);
 
       if (compositeResult.status === "rejected") {
@@ -152,9 +189,10 @@ export default function DashboardPage() {
       const composite = compositeResult.value;
       const scanner = scannerResult.status === "fulfilled" ? scannerResult.value.top_combinations : [];
       const turningPoints = turningPointsResult.status === "fulfilled" ? turningPointsResult.value.turning_points : [];
+      const prediction = predictionResult.status === "fulfilled" ? predictionResult.value : null;
 
       setDataMode("live");
-      setData({ composite, scanner, turningPoints, analysis: null });
+      setData({ composite, scanner, turningPoints, prediction, analysis: null });
       setLoading(false);
 
       try {
@@ -179,7 +217,7 @@ export default function DashboardPage() {
           }),
         });
 
-        setData({ composite, scanner, turningPoints, analysis });
+        setData({ composite, scanner, turningPoints, prediction, analysis });
       } catch (analystError) {
         setAnalysisError(analystError instanceof Error ? analystError.message : "Analisis AI belum tersedia");
       }
@@ -195,7 +233,7 @@ export default function DashboardPage() {
           ? `Data live belum tersedia, memakai data demo lokal. Detail: ${dashboardError.message}`
           : "Data live belum tersedia, memakai data demo lokal."
       );
-      setData({ composite, scanner, turningPoints, analysis: buildDemoAnalysis(nextTicker) });
+      setData({ composite, scanner, turningPoints, prediction: null, analysis: buildDemoAnalysis(nextTicker) });
     } finally {
       setAnalysisLoading(false);
     }
@@ -287,6 +325,61 @@ export default function DashboardPage() {
                 <strong>{data.scanner.length || "--"}</strong>
               </div>
             </div>
+
+            <section className="prediction-panel">
+              <div className="prediction-panel__header">
+                <div>
+                  <h2>Skor Prediksi</h2>
+                  <p>
+                    Horizon {data.prediction?.horizon_days ?? 30} hari
+                    {data.prediction ? `, data per ${data.prediction.as_of_date}` : ""}
+                  </p>
+                </div>
+                <span className={`prediction-signal prediction-signal--${data.prediction?.signal ?? "netral"}`}>
+                  {data.prediction?.signal ?? "belum tersedia"}
+                </span>
+              </div>
+
+              {data.prediction ? (
+                <>
+                  <div className="prediction-metrics">
+                    <div>
+                      <span>Probabilitas Naik</span>
+                      <strong>{formatPercent(data.prediction.probability_up)}</strong>
+                    </div>
+                    <div>
+                      <span>Estimasi Return</span>
+                      <strong>{formatPercent(data.prediction.expected_return)}</strong>
+                    </div>
+                    <div>
+                      <span>Confidence</span>
+                      <strong>{data.prediction.confidence}</strong>
+                    </div>
+                    <div>
+                      <span>Risiko</span>
+                      <strong>{data.prediction.risk_label}</strong>
+                    </div>
+                  </div>
+
+                  <div className="prediction-backtest">
+                    <span>Backtest</span>
+                    <strong>{formatPercent(data.prediction.backtest.hit_rate)} hit rate</strong>
+                    <span>{data.prediction.backtest.sample_count} sampel historis</span>
+                  </div>
+
+                  <div className="prediction-factors">
+                    {data.prediction.factors.map((factor) => (
+                      <div key={factor.name}>
+                        <span>{factor.name}</span>
+                        <strong>{factor.contribution.toFixed(3)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="prediction-empty">Prediksi belum tersedia. Data harga atau provider market mungkin sedang kosong.</p>
+              )}
+            </section>
 
             <div className="chart-panel">
               <div className="chart-panel__topline">

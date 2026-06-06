@@ -250,6 +250,104 @@ a {
   padding: 18px;
 }
 
+.prediction-panel {
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(7, 17, 36, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.prediction-panel__header,
+.prediction-metrics,
+.prediction-backtest,
+.prediction-factors div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prediction-panel__header {
+  margin-bottom: 12px;
+}
+
+.prediction-panel__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.prediction-panel__header p,
+.prediction-empty {
+  margin: 4px 0 0;
+  color: #94a3b8;
+}
+
+.prediction-signal {
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.prediction-signal--bullish {
+  background: rgba(34, 197, 94, 0.14);
+  color: #bbf7d0;
+}
+
+.prediction-signal--bearish {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fecaca;
+}
+
+.prediction-signal--netral {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fde68a;
+}
+
+.prediction-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.prediction-metrics div {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.prediction-metrics span,
+.prediction-backtest span,
+.prediction-factors span {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.prediction-metrics strong,
+.prediction-backtest strong,
+.prediction-factors strong {
+  color: #f8fafc;
+}
+
+.prediction-backtest {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.prediction-factors {
+  display: grid;
+  gap: 8px;
+}
+
+.prediction-factors div {
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+}
+
 .chart-panel__topline {
   display: flex;
   align-items: flex-start;
@@ -711,7 +809,8 @@ a {
     flex: 1;
   }
   .metric-row,
-  .insight-grid {
+  .insight-grid,
+  .prediction-metrics {
     grid-template-columns: 1fr;
   }
   .ai-panel {
