@@ -165,7 +165,7 @@ async def detect_turning_points(
         # Fetch market data
         end_date = date.today()
         start_date = end_date - timedelta(days=lookback_days)
-        market_data = await fetch_market_data(ticker, start_date, end_date)
+        market_data = fetch_market_data(ticker, start_date, end_date)
 
         if not market_data:
             return []

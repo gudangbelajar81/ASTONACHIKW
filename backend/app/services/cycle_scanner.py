@@ -8,11 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.db.models import AstroMeasurement
 from backend.app.services.ephemeris_service import DEFAULT_PLANETS
-from backend.app.services.market import configure_yfinance_cache
-
-configure_yfinance_cache()
-
-import yfinance as yf
+from backend.app.services.market import fetch_market_data as fetch_ohlcv_frame
 
 
 class ScanResult:
@@ -127,17 +123,16 @@ def fetch_market_data(
     end_date: date,
 ) -> list[dict[str, Any]] | None:
     try:
-        configure_yfinance_cache()
-        data = yf.download(ticker, start=start_date.isoformat(), end=end_date.isoformat(), progress=False)
+        data = fetch_ohlcv_frame(ticker, start_date, end_date)
         if data.empty:
             return None
-        data = data.reset_index()
-        data["returns"] = data["Close"].pct_change()
+        data = data.copy()
+        data["returns"] = data["close"].pct_change()
         data["direction"] = (data["returns"] > 0).astype(int)
         return [
             {
-                "date": pd.Timestamp(row["Date"]).date(),
-                "close": float(row["Close"]),
+                "date": pd.Timestamp(row["date"]).date(),
+                "close": float(row["close"]),
                 "returns": float(row["returns"]) if pd.notna(row["returns"]) else 0.0,
                 "direction": int(row["direction"]),
             }
