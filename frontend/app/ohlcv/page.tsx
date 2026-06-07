@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ColorType, createChart, ISeriesApi, Time } from "lightweight-charts";
 import Sidebar from "../../components/Sidebar";
+import { buildMarketProviderConfig, readMarketProviders } from "../../lib/apiKeys";
 import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
@@ -21,6 +22,9 @@ type OHLCVPoint = {
 };
 
 type Bandarmology = {
+  source?: string;
+  provider_name?: string | null;
+  provider_status?: string | null;
   smart_money_score: number;
   accumulation_score: number;
   distribution_score: number;
@@ -37,6 +41,7 @@ type OHLCVReport = {
   ticker: string;
   points: OHLCVPoint[];
   bandarmology: Bandarmology;
+  market_data_provider?: string | null;
 };
 
 function formatPercent(value: number) {
@@ -61,7 +66,23 @@ export default function OHLCVPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ohlcv/${encodeURIComponent(nextTicker)}?lookback_days=180`);
+      const marketProviders = readMarketProviders();
+      const liveProviders = buildMarketProviderConfig(marketProviders).market_data_providers;
+      const useLiveProvider = liveProviders.length > 0;
+      const response = await fetch(
+        useLiveProvider ? `${API_BASE_URL}/api/ohlcv/live/${encodeURIComponent(nextTicker)}` : `${API_BASE_URL}/api/ohlcv/${encodeURIComponent(nextTicker)}?lookback_days=180`,
+        useLiveProvider
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ticker: nextTicker,
+                lookback_days: 180,
+                market_data_providers: liveProviders,
+              }),
+            }
+          : undefined
+      );
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
@@ -159,6 +180,16 @@ export default function OHLCVPage() {
   }
 
   const latestClose = useMemo(() => report?.points.at(-1)?.close, [report]);
+  const liveProviderLabel = useMemo(() => {
+    if (!report?.bandarmology) return "";
+    if (report.bandarmology.source === "live" && report.bandarmology.provider_name) {
+      return `Live: ${report.bandarmology.provider_name}`;
+    }
+    if (report.bandarmology.source === "internal_fallback" && report.bandarmology.provider_name) {
+      return `Fallback: ${report.bandarmology.provider_name}`;
+    }
+    return report?.market_data_provider ? `Provider: ${report.market_data_provider}` : "Internal proxy";
+  }, [report]);
 
   return (
     <div className="dashboard-shell">
@@ -184,6 +215,7 @@ export default function OHLCVPage() {
                 <h2>{report?.ticker ?? ticker} Candlestick</h2>
                 <p>MA20 biru, MA50 kuning, MA200 ungu. Close terakhir: {latestClose ?? "--"}</p>
               </div>
+              <span>{liveProviderLabel}</span>
             </div>
             <div ref={chartRef} className="ohlcv-chart" />
             <div ref={volumeRef} className="ohlcv-volume" />
@@ -193,13 +225,20 @@ export default function OHLCVPage() {
             <h2>Bandarmology Proxy</h2>
             {report ? (
               <>
-                <span className={`prediction-signal prediction-signal--${report.bandarmology.verdict === "distribusi" ? "bearish" : report.bandarmology.verdict === "akumulasi" ? "bullish" : "netral"}`}>
-                  {report.bandarmology.verdict}
-                </span>
-                <div className="bandar-metrics">
-                  <div><span>Smart Money</span><strong>{formatPercent(report.bandarmology.smart_money_score)}</strong></div>
-                  <div><span>Akumulasi</span><strong>{formatPercent(report.bandarmology.accumulation_score)}</strong></div>
-                  <div><span>Distribusi</span><strong>{formatPercent(report.bandarmology.distribution_score)}</strong></div>
+              <span className={`prediction-signal prediction-signal--${report.bandarmology.verdict === "distribusi" ? "bearish" : report.bandarmology.verdict === "akumulasi" ? "bullish" : "netral"}`}>
+                {report.bandarmology.verdict}
+              </span>
+              <p className="page-subtitle">
+                {report.bandarmology.source === "live"
+                  ? "Bandarmology live dibaca dari provider yang aktif di Settings."
+                  : report.bandarmology.source === "internal_fallback"
+                    ? "Provider live gagal, app memakai fallback internal."
+                    : "Bandarmology proxy internal aktif."}
+              </p>
+              <div className="bandar-metrics">
+                <div><span>Smart Money</span><strong>{formatPercent(report.bandarmology.smart_money_score)}</strong></div>
+                <div><span>Akumulasi</span><strong>{formatPercent(report.bandarmology.accumulation_score)}</strong></div>
+                <div><span>Distribusi</span><strong>{formatPercent(report.bandarmology.distribution_score)}</strong></div>
                   <div><span>Volume Spike</span><strong>{report.bandarmology.volume_spike.toFixed(2)}x</strong></div>
                   <div><span>OBV</span><strong>{report.bandarmology.obv_trend}</strong></div>
                   <div><span>Money Flow</span><strong>{formatPercent(report.bandarmology.money_flow_score)}</strong></div>

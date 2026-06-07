@@ -590,7 +590,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="market-provider-list">
+              <div className="market-provider-list">
               {marketProviders.map((provider) => (
                 <article className="market-provider-card" key={provider.id}>
                   <div className="market-provider-card__topline">
@@ -607,7 +607,7 @@ export default function SettingsPage() {
                     Endpoint API
                     <input
                       value={provider.endpoint}
-                      placeholder="https://provider-api.com/idx/broker-summary"
+                      placeholder="https://provider-api.com/idx/broker-summary/{ticker}?days={days}"
                       onChange={(event) =>
                         saveMarketProviders(
                           marketProviders.map((item) =>
@@ -617,6 +617,11 @@ export default function SettingsPage() {
                       }
                     />
                   </label>
+
+                  <p className="page-subtitle">
+                    Pakai <code>{`{ticker}`}</code> dan <code>{`{days}`}</code> di endpoint kalau provider mendukung
+                    template. Untuk RapidAPI, isi endpoint lengkap lalu cukup tempel API key.
+                  </p>
 
                   <label>
                     API Key
