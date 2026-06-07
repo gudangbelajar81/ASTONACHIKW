@@ -12,6 +12,7 @@ import {
   readSavedWatchlists,
   writeSavedWatchlists,
 } from "../../lib/userData";
+import { saveCloudState } from "../../lib/cloudState";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -100,6 +101,7 @@ export default function WatchlistPage() {
     ]);
     setSavedMessage(`Watchlist "${saveName}" tersimpan.`);
     appendUsageEvent({ action: "watchlist_save", ticker: currentTickers[0], source: "watchlist" });
+    void saveCloudState();
   }
 
   return (

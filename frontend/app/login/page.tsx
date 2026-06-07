@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { saveCloudState, syncFromCloud } from "../../lib/cloudState";
 
 function getApiUrl() {
   const configuredUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -65,6 +66,10 @@ export default function LoginPage() {
     const data = await response.json();
     localStorage.setItem("astrocycle_token", data.access_token);
     localStorage.setItem("astrocycle_user", email);
+    const pulled = await syncFromCloud();
+    if (!pulled) {
+      await saveCloudState();
+    }
     return true;
   }
 

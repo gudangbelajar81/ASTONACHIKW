@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.security import get_password_hash, verify_password
-from backend.app.db.models import Subscription, User
+from backend.app.db.models import Subscription, User, UserAppState
 from backend.app.schemas.subscription import SubscriptionCreate
 from backend.app.schemas.user import UserCreate
 
@@ -53,3 +53,21 @@ async def get_user_subscriptions(session: AsyncSession, user_id: int) -> list[Su
     query = select(Subscription).where(Subscription.user_id == user_id).order_by(Subscription.started_at.desc())
     result = await session.execute(query)
     return result.scalars().all()
+
+
+async def get_user_app_state(session: AsyncSession, user_id: int) -> UserAppState | None:
+    query = select(UserAppState).where(UserAppState.user_id == user_id)
+    result = await session.execute(query)
+    return result.scalars().first()
+
+
+async def upsert_user_app_state(session: AsyncSession, user_id: int, payload: dict) -> UserAppState:
+    state = await get_user_app_state(session, user_id)
+    if state:
+        state.payload = payload
+    else:
+        state = UserAppState(user_id=user_id, payload=payload)
+        session.add(state)
+    await session.commit()
+    await session.refresh(state)
+    return state

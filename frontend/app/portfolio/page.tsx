@@ -11,6 +11,7 @@ import {
   readPortfolio,
   writePortfolio,
 } from "../../lib/userData";
+import { saveCloudState } from "../../lib/cloudState";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -45,6 +46,7 @@ export default function PortfolioPage() {
   function save(nextHoldings: PortfolioHolding[]) {
     setHoldings(nextHoldings);
     writePortfolio(nextHoldings);
+    void saveCloudState();
   }
 
   const refreshPortfolio = useCallback(async (nextHoldings: PortfolioHolding[]) => {

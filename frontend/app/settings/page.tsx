@@ -28,6 +28,7 @@ import {
   PlanProfile,
   UsageEvent,
 } from "../../lib/userData";
+import { saveCloudState, readStoredToken, syncFromCloud } from "../../lib/cloudState";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -60,6 +61,7 @@ export default function SettingsPage() {
   const [usageLog, setUsageLog] = useState<UsageEvent[]>([]);
   const [backupJson, setBackupJson] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [cloudStatus, setCloudStatus] = useState("");
 
   useEffect(() => {
     setProviders(readApiProviders());
@@ -214,6 +216,43 @@ export default function SettingsPage() {
     }
   }
 
+  async function syncToCloud() {
+    try {
+      if (!readStoredToken()) {
+        setCloudStatus("Login dulu agar bisa sinkron ke backend.");
+        return;
+      }
+      const ok = await saveCloudState();
+      setCloudStatus(ok ? "Data lokal tersimpan ke cloud." : "Gagal menyimpan ke cloud.");
+      appendUsageEvent({ action: "cloud_save", ticker: "local", source: "settings" });
+    } catch {
+      setCloudStatus("Gagal menyimpan ke cloud.");
+    }
+  }
+
+  async function syncFromCloudAction() {
+    try {
+      if (!readStoredToken()) {
+        setCloudStatus("Login dulu agar bisa tarik data dari cloud.");
+        return;
+      }
+      const ok = await syncFromCloud();
+      if (ok) {
+        setProviders(readApiProviders());
+        setMarketProviders(readMarketProviders());
+        setMarketMode(readMarketMode());
+        setPlanProfile(readPlanProfile());
+        setUsageLog(readUsageLog());
+        setCloudStatus("Data cloud berhasil dimuat.");
+        appendUsageEvent({ action: "cloud_load", ticker: "local", source: "settings" });
+      } else {
+        setCloudStatus("Belum ada state cloud untuk user ini.");
+      }
+    } catch {
+      setCloudStatus("Gagal memuat data cloud.");
+    }
+  }
+
   return (
     <div className="dashboard-shell">
       <Sidebar />
@@ -225,6 +264,7 @@ export default function SettingsPage() {
         </div>
 
         {statusMessage ? <div className="dashboard-alert">{statusMessage}</div> : null}
+        {cloudStatus ? <div className="dashboard-alert">{cloudStatus}</div> : null}
 
         <div className="settings-section-tabs">
           <button className={section === "ai" ? "active" : ""} type="button" onClick={() => setSection("ai")}>
@@ -554,6 +594,12 @@ export default function SettingsPage() {
               </button>
               <button type="button" onClick={importBackup} disabled={!backupJson.trim()}>
                 Import JSON
+              </button>
+              <button type="button" onClick={syncFromCloudAction}>
+                Load Cloud
+              </button>
+              <button type="button" onClick={syncToCloud}>
+                Save Cloud
               </button>
               <button type="button" onClick={() => setBackupJson("")}>
                 Bersihkan

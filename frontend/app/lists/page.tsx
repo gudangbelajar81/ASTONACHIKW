@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Sidebar from "../../components/Sidebar";
 import { SavedWatchlist, makeId, readSavedWatchlists, writeSavedWatchlists } from "../../lib/userData";
+import { saveCloudState } from "../../lib/cloudState";
 
 function normalizeTickers(raw: string) {
   return raw
@@ -38,6 +39,7 @@ export default function SavedWatchlistsPage() {
   function persist(nextLists: SavedWatchlist[]) {
     setLists(nextLists);
     writeSavedWatchlists(nextLists);
+    void saveCloudState();
   }
 
   function startEdit(list: SavedWatchlist) {

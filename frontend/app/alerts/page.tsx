@@ -12,6 +12,7 @@ import {
   readMarketMode,
   writeAlerts,
 } from "../../lib/userData";
+import { saveCloudState } from "../../lib/cloudState";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -65,6 +66,7 @@ export default function AlertsPage() {
   function save(nextAlerts: UserAlert[]) {
     setAlerts(nextAlerts);
     writeAlerts(nextAlerts);
+    void saveCloudState();
   }
 
   function addAlert(event: FormEvent<HTMLFormElement>) {

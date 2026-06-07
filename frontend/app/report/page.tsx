@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import { appendReportLog, appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
+import { saveCloudState } from "../../lib/cloudState";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -145,6 +146,7 @@ export default function ReportPage() {
         confidence: nextReport.prediction.confidence,
       });
       appendUsageEvent({ action: "report_generate", ticker: nextTicker, source: "report" });
+      void saveCloudState();
     } catch (exc) {
       setReport(null);
       setError(exc instanceof Error ? exc.message : "Gagal membuat report strategi.");

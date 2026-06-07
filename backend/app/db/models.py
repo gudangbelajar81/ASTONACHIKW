@@ -103,3 +103,15 @@ class ModelWeightProfile(Base):
     __table_args__ = (
         UniqueConstraint("symbol", "horizon_days", name="uq_weight_profile_symbol_horizon"),
     )
+
+
+class UserAppState(Base):
+    __tablename__ = "user_app_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    payload = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User")
