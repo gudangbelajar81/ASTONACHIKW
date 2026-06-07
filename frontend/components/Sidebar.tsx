@@ -20,6 +20,15 @@ export default function Sidebar() {
           <Link href="/ohlcv" className="nav-link">
             OHLCV Pro
           </Link>
+          <Link href="/alerts" className="nav-link">
+            Alerts
+          </Link>
+          <Link href="/portfolio" className="nav-link">
+            Portfolio
+          </Link>
+          <Link href="/explain" className="nav-link">
+            Explain
+          </Link>
           <Link href="/login" className="nav-link">
             Akun
           </Link>
