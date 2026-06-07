@@ -3,8 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.db.session import get_session
 from backend.app.schemas.prediction import ModelWeightResponse, PerformanceResponse, PredictionResponse, WatchlistResponse
+from backend.app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from backend.app.schemas.workflow import WorkflowResponse
 from backend.app.services.prediction_engine import (
+    build_idx_recommendation,
     build_idx_workflow,
     build_performance_report,
     build_prediction,
@@ -86,3 +88,39 @@ async def read_idx_workflow(
         return WorkflowResponse(**report)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gagal membaca workflow IDX: {exc}")
+
+
+@router.get("/recommendations/idx/{ticker}", response_model=RecommendationResponse)
+async def read_idx_recommendation(
+    ticker: str,
+    horizon: str = Query(default="weekly"),
+    market: str = Query(default="id"),
+    session: AsyncSession = Depends(get_session),
+) -> RecommendationResponse:
+    try:
+        report = await build_idx_recommendation(session, ticker, horizon=horizon, market=market)
+        return RecommendationResponse(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal membuat rekomendasi IDX: {exc}")
+
+
+@router.post("/recommendations/idx", response_model=RecommendationResponse)
+async def read_live_idx_recommendation(
+    request: RecommendationRequest,
+    session: AsyncSession = Depends(get_session),
+) -> RecommendationResponse:
+    try:
+        report = await build_idx_recommendation(
+            session,
+            request.ticker,
+            horizon=request.horizon,
+            market=request.market,
+            market_data_providers=request.market_data_providers,
+        )
+        return RecommendationResponse(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal membuat rekomendasi IDX: {exc}")

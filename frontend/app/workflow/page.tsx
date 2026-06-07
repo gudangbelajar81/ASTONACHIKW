@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { buildMarketProviderConfig, readMarketProviders } from "../../lib/apiKeys";
 import { normalizeTickerList, readMarketMode, writeMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
@@ -59,6 +60,44 @@ type WorkflowResponse = {
   items: WorkflowItem[];
 };
 
+type RecommendationResponse = {
+  symbol: string;
+  market: string;
+  horizon: string;
+  final_score: number;
+  signal: string;
+  confidence: number;
+  last_price: number;
+  entry_zone: number[];
+  target_1: number;
+  target_2: number;
+  stop_loss: number;
+  risk_reward: number;
+  score_breakdown: Record<string, number>;
+  main_reasons: string[];
+  main_risks: string[];
+  price_context: {
+    ma20?: number | null;
+    ma50?: number | null;
+    ma200?: number | null;
+    support: number;
+    resistance: number;
+    volume_ratio_5d: number;
+    relative_strength: number;
+  };
+  data_quality: {
+    ohlcv_available: boolean;
+    bandarmology_available: boolean;
+    macro_available: boolean;
+    fundamental_available: boolean;
+  };
+  validation: {
+    sample_size: number;
+    max_drawdown?: number | null;
+    last_updated: string;
+  };
+};
+
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(1)}%`;
 }
@@ -74,12 +113,39 @@ export default function WorkflowPage() {
   const [tickers, setTickers] = useState(PRESET_IDX);
   const [market, setMarket] = useState<"id" | "us">("id");
   const [report, setReport] = useState<WorkflowResponse | null>(null);
+  const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     setMarket(readMarketMode());
   }, []);
+
+  async function loadRecommendation(ticker: string, nextMarket: "id" | "us") {
+    setRecommendationLoading(true);
+    try {
+      const providerConfig = buildMarketProviderConfig(readMarketProviders());
+      const response = await fetch(`${API_BASE_URL}/api/recommendations/idx`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker,
+          horizon: "weekly",
+          market: nextMarket,
+          market_data_providers: providerConfig.market_data_providers,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Gagal membaca rekomendasi terstruktur.");
+      }
+      setRecommendation((await response.json()) as RecommendationResponse);
+    } catch {
+      setRecommendation(null);
+    } finally {
+      setRecommendationLoading(false);
+    }
+  }
 
   async function loadWorkflow(nextTickers: string, nextMarket: "id" | "us") {
     setLoading(true);
@@ -92,9 +158,17 @@ export default function WorkflowPage() {
         const body = await response.json().catch(() => null);
         throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
       }
-      setReport((await response.json()) as WorkflowResponse);
+      const nextReport = (await response.json()) as WorkflowResponse;
+      setReport(nextReport);
+      const top = nextReport.items[0];
+      if (top) {
+        void loadRecommendation(top.ticker, nextMarket);
+      } else {
+        setRecommendation(null);
+      }
     } catch (exc) {
       setReport(null);
+      setRecommendation(null);
       setError(exc instanceof Error ? exc.message : "Gagal membaca workflow IDX.");
     } finally {
       setLoading(false);
@@ -190,6 +264,67 @@ export default function WorkflowPage() {
             <span>Aksi Teratas</span>
             <strong>{topTicker?.recommended_action ?? "--"}</strong>
           </div>
+        </section>
+
+        <section className="workflow-card">
+          <div className="workflow-card__topline">
+            <div>
+              <h2>Rekomendasi Terstruktur</h2>
+              <p>
+                {recommendation
+                  ? `${recommendation.symbol} • ${recommendation.signal} • confidence ${formatPercent(recommendation.confidence)}`
+                  : recommendationLoading
+                    ? "Menghitung rekomendasi top rank..."
+                    : "Belum ada rekomendasi terstruktur."}
+              </p>
+            </div>
+            <span className="prediction-signal prediction-signal--bullish">
+              {recommendation ? `${recommendation.final_score}/100` : "--"}
+            </span>
+          </div>
+
+          {recommendation ? (
+            <>
+              <div className="workflow-levels">
+                <div>
+                  <span>Entry</span>
+                  <strong>{formatCurrency(recommendation.entry_zone[0])} - {formatCurrency(recommendation.entry_zone[1])}</strong>
+                </div>
+                <div>
+                  <span>Target 1 / 2</span>
+                  <strong>{formatCurrency(recommendation.target_1)} / {formatCurrency(recommendation.target_2)}</strong>
+                </div>
+                <div>
+                  <span>Stop Loss</span>
+                  <strong>{formatCurrency(recommendation.stop_loss)}</strong>
+                </div>
+                <div>
+                  <span>Risk/Reward</span>
+                  <strong>{recommendation.risk_reward.toFixed(2)}x</strong>
+                </div>
+              </div>
+
+              <div className="workflow-timeframes">
+                {Object.entries(recommendation.score_breakdown).map(([key, value]) => (
+                  <div key={key}>
+                    <span>{key.replace("_", " ")}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className="workflow-reasons">
+                <h3>Alasan Utama</h3>
+                <ul>
+                  {recommendation.main_reasons.map((reason) => <li key={reason}>{reason}</li>)}
+                </ul>
+                <h3>Risiko Utama</h3>
+                <ul>
+                  {recommendation.main_risks.map((risk) => <li key={risk}>{risk}</li>)}
+                </ul>
+              </div>
+            </>
+          ) : null}
         </section>
 
         <section className="workflow-list">

@@ -745,6 +745,233 @@ async def build_idx_workflow(
     }
 
 
+def _safe_float(value: object, fallback: float = 0.0) -> float:
+    try:
+        if value is None or pd.isna(value):
+            return fallback
+        return float(value)
+    except Exception:
+        return fallback
+
+
+def _score_label(final_score: int, risk_reward: float) -> str:
+    if final_score >= 82 and risk_reward >= 1.8:
+        return "Strong Buy Candidate"
+    if final_score >= 70 and risk_reward >= 1.5:
+        return "Strong Watch"
+    if final_score >= 58:
+        return "Watch"
+    if final_score >= 45:
+        return "Neutral"
+    return "Avoid"
+
+
+def _horizon_days_from_label(horizon: str) -> int:
+    normalized = horizon.strip().lower()
+    if normalized in {"daily", "harian"}:
+        return 5
+    if normalized in {"monthly", "bulanan"}:
+        return 60
+    return 20
+
+
+def _round_price(value: float, market: str) -> float:
+    if market == "id":
+        if value >= 5000:
+            step = 25
+        elif value >= 2000:
+            step = 10
+        elif value >= 500:
+            step = 5
+        else:
+            step = 1
+        return float(round(value / step) * step)
+    return round(value, 2)
+
+
+def _pct_change(close: pd.Series, days: int) -> float:
+    if len(close) <= days:
+        return 0.0
+    previous = _safe_float(close.iloc[-days - 1])
+    latest = _safe_float(close.iloc[-1])
+    if previous <= 0:
+        return 0.0
+    return latest / previous - 1
+
+
+def _max_drawdown(close: pd.Series) -> float:
+    values = close.astype(float)
+    peak = values.cummax()
+    drawdown = values / peak - 1
+    return float(drawdown.min()) if len(drawdown) else 0.0
+
+
+async def build_idx_recommendation(
+    session: AsyncSession,
+    ticker: str,
+    horizon: str = "weekly",
+    market: str = "id",
+    market_data_providers: list | None = None,
+) -> dict:
+    symbol = normalize_backend_ticker(ticker, market)
+    horizon_days = _horizon_days_from_label(horizon)
+    df = await load_price_frame(session, symbol, max(300, horizon_days * 8))
+    if df.empty or len(df) < 60:
+        raise ValueError(f"Data OHLCV belum cukup untuk {symbol}.")
+
+    from backend.app.services.bandarmology_engine import build_bandarmology, build_live_bandarmology, enrich_ohlcv
+
+    enriched = enrich_ohlcv(df).dropna(subset=["close"]).reset_index(drop=True)
+    latest = enriched.iloc[-1]
+    close = enriched["close"].astype(float)
+    volume = enriched["volume"].astype(float)
+    latest_close = _safe_float(latest.close)
+    ma20 = _safe_float(latest.ma20, latest_close)
+    ma50 = _safe_float(latest.ma50, latest_close)
+    ma200 = _safe_float(latest.ma200, latest_close)
+    support = _safe_float(enriched["low"].tail(30).min(), latest_close * 0.96)
+    resistance = _safe_float(enriched["high"].tail(30).max(), latest_close * 1.04)
+    volume_5 = _safe_float(volume.tail(5).mean())
+    volume_20 = _safe_float(volume.tail(20).mean())
+    volume_ratio = volume_5 / volume_20 if volume_20 > 0 else 1.0
+
+    selected_provider = None
+    for provider in market_data_providers or []:
+        if getattr(provider, "endpoint", "") and getattr(provider, "api_key", ""):
+            selected_provider = provider
+            break
+    bandarmology = (
+        build_live_bandarmology(enriched, symbol, selected_provider, 30)
+        if selected_provider
+        else build_bandarmology(enriched, symbol)
+    )
+
+    benchmark_symbol = "^JKSE" if market == "id" else "SPY"
+    relative_strength = 0.0
+    macro_available = False
+    try:
+        benchmark_df = await load_price_frame(session, benchmark_symbol, 120)
+        stock_return = _pct_change(close, horizon_days)
+        benchmark_return = _pct_change(benchmark_df["close"].astype(float), horizon_days)
+        relative_strength = stock_return - benchmark_return
+        macro_available = True
+    except Exception:
+        stock_return = _pct_change(close, horizon_days)
+
+    technical_score = 0
+    technical_score += 8 if ma20 > ma50 else 0
+    technical_score += 5 if ma50 > ma200 else 0
+    technical_score += 5 if latest_close > ma20 else 0
+    technical_score += 4 if stock_return > 0 else 0
+    technical_score += 3 if resistance > latest_close else 0
+    technical_score = min(25, technical_score)
+
+    volume_score = min(15, max(0, round((volume_ratio - 0.8) / 0.8 * 15)))
+    relative_strength_score = min(15, max(0, round((relative_strength + 0.04) / 0.12 * 15)))
+    smart_money = _safe_float(bandarmology.get("smart_money_score"))
+    bandar_score = min(20, max(0, round((smart_money + 1) / 2 * 20)))
+    if bandarmology.get("verdict") == "akumulasi":
+        bandar_score = min(20, bandar_score + 3)
+    if bandarmology.get("verdict") == "distribusi":
+        bandar_score = max(0, bandar_score - 5)
+
+    atr_proxy = _safe_float((enriched["high"].astype(float) - enriched["low"].astype(float)).tail(14).mean(), latest_close * 0.025)
+    stop_loss = min(support, latest_close - atr_proxy * 1.2)
+    if stop_loss >= latest_close:
+        stop_loss = latest_close * 0.97
+    target_1 = max(resistance, latest_close + atr_proxy * 1.8)
+    target_2 = max(target_1 * 1.03, latest_close + atr_proxy * 3.0)
+    entry_low = max(stop_loss * 1.01, latest_close - atr_proxy * 0.8)
+    entry_high = min(latest_close * 1.01, latest_close + atr_proxy * 0.2)
+    risk_per_share = max(entry_high - stop_loss, 0.01)
+    reward_per_share = max(target_1 - entry_high, 0.01)
+    risk_reward = round(reward_per_share / risk_per_share, 2)
+    risk_reward_score = min(10, max(0, round(risk_reward / 3 * 10)))
+    macro_score = 5 if macro_available and relative_strength >= -0.02 else 2 if macro_available else 0
+
+    score_breakdown = {
+        "technical": int(technical_score),
+        "volume": int(volume_score),
+        "relative_strength": int(relative_strength_score),
+        "bandarmology": int(bandar_score),
+        "risk_reward": int(risk_reward_score),
+        "macro": int(macro_score),
+    }
+    final_score = int(min(100, sum(score_breakdown.values())))
+    confidence = round(min(0.95, max(0.35, final_score / 100 * 0.75 + (0.08 if len(enriched) >= 200 else 0))), 2)
+
+    reasons: list[str] = []
+    if ma20 > ma50:
+        reasons.append("Trend MA20 berada di atas MA50.")
+    if latest_close > ma20:
+        reasons.append("Harga terakhir bertahan di atas MA20.")
+    if volume_ratio >= 1.12:
+        reasons.append("Volume 5 hari terakhir meningkat dibanding rata-rata 20 hari.")
+    if relative_strength > 0:
+        reasons.append("Relative strength mengalahkan benchmark pasar.")
+    if bandarmology.get("verdict") == "akumulasi":
+        reasons.append("Bandarmology menunjukkan akumulasi.")
+    elif smart_money > 0:
+        reasons.append("Smart money proxy masih positif.")
+    if risk_reward >= 1.5:
+        reasons.append(f"Risk/reward masih layak di sekitar {risk_reward}x.")
+    if not reasons:
+        reasons.append("Belum ada sinyal dominan; ticker masuk mode pantau.")
+
+    risks: list[str] = []
+    risks.append(f"Support {round(stop_loss, 2)} tidak boleh ditembus.")
+    if latest_close >= resistance * 0.98:
+        risks.append("Harga sudah dekat resistance, rawan pullback pendek.")
+    if volume_ratio < 0.9:
+        risks.append("Volume belum mendukung konfirmasi kuat.")
+    if bandarmology.get("verdict") == "distribusi":
+        risks.append("Bandarmology mendeteksi tekanan distribusi.")
+    if not macro_available:
+        risks.append("Data benchmark/makro belum lengkap, relative strength memakai estimasi terbatas.")
+
+    signal = _score_label(final_score, risk_reward)
+    as_of = latest.date.isoformat() if hasattr(latest.date, "isoformat") else str(latest.date)
+    return {
+        "symbol": symbol,
+        "market": market,
+        "horizon": horizon,
+        "final_score": final_score,
+        "signal": signal,
+        "confidence": confidence,
+        "last_price": _round_price(latest_close, market),
+        "entry_zone": [_round_price(entry_low, market), _round_price(entry_high, market)],
+        "target_1": _round_price(target_1, market),
+        "target_2": _round_price(target_2, market),
+        "stop_loss": _round_price(stop_loss, market),
+        "risk_reward": risk_reward,
+        "score_breakdown": score_breakdown,
+        "main_reasons": reasons[:6],
+        "main_risks": risks[:5],
+        "price_context": {
+            "last_price": _round_price(latest_close, market),
+            "ma20": _round_price(ma20, market),
+            "ma50": _round_price(ma50, market),
+            "ma200": _round_price(ma200, market),
+            "support": _round_price(support, market),
+            "resistance": _round_price(resistance, market),
+            "volume_ratio_5d": round(volume_ratio, 2),
+            "relative_strength": round(relative_strength, 4),
+        },
+        "data_quality": {
+            "ohlcv_available": True,
+            "bandarmology_available": bool(bandarmology),
+            "macro_available": macro_available,
+            "fundamental_available": False,
+        },
+        "validation": {
+            "backtest_win_rate": None,
+            "sample_size": int(len(enriched)),
+            "max_drawdown": round(_max_drawdown(close.tail(120)), 4),
+            "last_updated": as_of,
+        },
+    }
+
+
 async def get_market_rows(session: AsyncSession, symbol: str) -> list[MarketPrice]:
     result = await session.execute(
         select(MarketPrice)
