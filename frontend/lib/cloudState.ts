@@ -1,3 +1,4 @@
+import { readApiProviders, readMarketProviders, writeApiProviders, writeMarketProviders } from "./apiKeys";
 import { exportUserData, importUserData } from "./userData";
 
 function getApiUrl() {
@@ -25,7 +26,13 @@ export async function loadCloudState() {
   });
 
   if (!response.ok) return null;
-  return response.json() as Promise<{ payload: ReturnType<typeof exportUserData> } | null>;
+  return response.json() as Promise<{
+    payload: {
+      user: ReturnType<typeof exportUserData>;
+      apiProviders: ReturnType<typeof readApiProviders>;
+      marketProviders: ReturnType<typeof readMarketProviders>;
+    };
+  } | null>;
 }
 
 export async function saveCloudState() {
@@ -38,7 +45,13 @@ export async function saveCloudState() {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ payload: exportUserData() }),
+    body: JSON.stringify({
+      payload: {
+        user: exportUserData(),
+        apiProviders: readApiProviders(),
+        marketProviders: readMarketProviders(),
+      },
+    }),
   });
 
   return response.ok;
@@ -47,6 +60,8 @@ export async function saveCloudState() {
 export async function syncFromCloud() {
   const cloud = await loadCloudState();
   if (!cloud?.payload) return false;
-  importUserData(cloud.payload);
+  importUserData(cloud.payload.user);
+  writeApiProviders(cloud.payload.apiProviders);
+  writeMarketProviders(cloud.payload.marketProviders);
   return true;
 }

@@ -219,6 +219,41 @@ def call_gemini(*, api_key: str, model: str, prompt: str) -> str:
     return text
 
 
+def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
+    url = "https://api.kie.ai/claude/v1/messages"
+    payload = {
+        "model": model,
+        "max_tokens": 1500,
+        "temperature": 0.7,
+        "system": AI_SYSTEM_MESSAGE,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ],
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-Api-Key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=45) as response:
+        body = json.loads(response.read().decode("utf-8"))
+
+    content = body.get("content") or []
+    text = "".join(block.get("text", "") for block in content if isinstance(block, dict))
+    if not text.strip():
+        raise ValueError("Kie.ai Claude mengembalikan jawaban kosong.")
+    return text
+
+
 def local_analysis(analyst_input: AnalystInput) -> AnalystOutput:
     recent_cycle = analyst_input.composite_cycle_data[-30:] if analyst_input.composite_cycle_data else []
     latest_value = recent_cycle[-1].get("value", 0) if recent_cycle else 0
@@ -260,6 +295,8 @@ def local_analysis(analyst_input: AnalystInput) -> AnalystOutput:
 def get_provider_keys(provider: str, overrides: Optional[Dict[str, List[str]]] = None) -> list[str]:
     if overrides and provider in overrides:
         return split_keys(overrides[provider])
+    if provider == "kie":
+        return split_keys(settings.KIE_API_KEY)
     if provider == "openai":
         return split_keys(settings.OPENAI_API_KEY)
     if provider == "gemini":
@@ -274,6 +311,8 @@ def get_provider_keys(provider: str, overrides: Optional[Dict[str, List[str]]] =
 def get_provider_model(provider: str, overrides: Optional[Dict[str, str]] = None) -> str:
     if overrides and overrides.get(provider):
         return overrides[provider]
+    if provider == "kie":
+        return settings.KIE_MODEL
     if provider == "openai":
         return settings.OPENAI_MODEL
     if provider == "gemini":
@@ -292,6 +331,17 @@ def generate_with_provider(
     model_overrides: Optional[Dict[str, str]] = None,
 ) -> str:
     errors = []
+    if provider == "kie":
+        for key in get_provider_keys(provider, key_overrides):
+            try:
+                return call_kie_claude(
+                    api_key=key,
+                    model=get_provider_model(provider, model_overrides),
+                    prompt=prompt,
+                )
+            except Exception as exc:
+                errors.append(str(exc))
+        raise ValueError("; ".join(errors) or "KIE_API_KEY kosong")
     if provider == "openai":
         for key in get_provider_keys(provider, key_overrides):
             try:
@@ -380,6 +430,9 @@ def test_provider_key(provider: str, api_key: str, model: Optional[str] = None) 
         "Jawab hanya dengan kata OK. Ini adalah tes koneksi API untuk AstroCycle."
     )
 
+    if normalized_provider == "kie":
+        call_kie_claude(api_key=api_key, model=selected_model, prompt=prompt)
+        return
     if normalized_provider == "openai":
         call_openai_compatible(api_key=api_key, model=selected_model, prompt=prompt)
         return

@@ -1,4 +1,4 @@
-export type ApiProviderId = "gemini" | "deepseek" | "xai" | "openai";
+export type ApiProviderId = "kie" | "gemini" | "deepseek" | "xai" | "openai";
 
 export type ApiKeyEntry = {
   id: string;
@@ -32,6 +32,7 @@ export const API_KEYS_STORAGE_KEY = "astrocycle_api_provider_settings";
 export const MARKET_PROVIDER_STORAGE_KEY = "astrocycle_market_provider_settings";
 
 export const DEFAULT_API_PROVIDERS: ApiProviderConfig[] = [
+  { id: "kie", name: "Kie.ai / Claude", model: "claude-opus-4-6", keys: [] },
   { id: "gemini", name: "Gemini", model: "gemini-2.5-flash", keys: [] },
   { id: "deepseek", name: "DeepSeek", model: "deepseek-chat", keys: [] },
   { id: "xai", name: "Grok / xAI", model: "grok-4.3", keys: [] },
