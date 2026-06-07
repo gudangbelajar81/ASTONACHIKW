@@ -11,6 +11,7 @@ export default function Sidebar() {
     { href: "/performance", label: "Performance" },
     { href: "/watchlist", label: "Watchlist" },
     { href: "/workflow", label: "IDX Workflow" },
+    { href: "/backtest", label: "Backtest & Screener" },
     { href: "/lists", label: "Saved Watchlists" },
     { href: "/ohlcv", label: "OHLCV Pro" },
     { href: "/studio/image", label: "Studio Gambar" },

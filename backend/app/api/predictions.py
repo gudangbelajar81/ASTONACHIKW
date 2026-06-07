@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.db.session import get_session
+from backend.app.schemas.backtest import BacktestRequest, BacktestResponse, ScreenerRequest, ScreenerResponse
 from backend.app.schemas.prediction import ModelWeightResponse, PerformanceResponse, PredictionResponse, WatchlistResponse
 from backend.app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from backend.app.schemas.workflow import WorkflowResponse
+from backend.app.services.idx_backtest import run_idx_backtest, run_idx_screener
 from backend.app.services.prediction_engine import (
     build_idx_recommendation,
     build_idx_workflow,
@@ -124,3 +126,31 @@ async def read_live_idx_recommendation(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gagal membuat rekomendasi IDX: {exc}")
+
+
+@router.post("/idx/backtest", response_model=BacktestResponse)
+async def run_idx_backtest_report(
+    request: BacktestRequest,
+    session: AsyncSession = Depends(get_session),
+) -> BacktestResponse:
+    try:
+        report = await run_idx_backtest(session, request)
+        return BacktestResponse(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal menjalankan backtest IDX: {exc}")
+
+
+@router.post("/run-idx-screener", response_model=ScreenerResponse)
+async def run_idx_screener_report(
+    request: ScreenerRequest,
+    session: AsyncSession = Depends(get_session),
+) -> ScreenerResponse:
+    try:
+        report = await run_idx_screener(session, request)
+        return ScreenerResponse(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal menjalankan IDX screener: {exc}")
