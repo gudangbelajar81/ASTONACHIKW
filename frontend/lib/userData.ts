@@ -16,8 +16,26 @@ export type PortfolioHolding = {
   averagePrice: number;
 };
 
+export type SavedWatchlist = {
+  id: string;
+  name: string;
+  tickers: string[];
+  createdAt: string;
+};
+
+export type ReportLog = {
+  id: string;
+  ticker: string;
+  generatedAt: string;
+  signal: string;
+  regime: string;
+  confidence: string;
+};
+
 const ALERTS_KEY = "astrocycle_user_alerts";
 const PORTFOLIO_KEY = "astrocycle_portfolio_holdings";
+const WATCHLISTS_KEY = "astrocycle_saved_watchlists";
+const REPORT_HISTORY_KEY = "astrocycle_report_history";
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -46,6 +64,36 @@ export function readPortfolio(): PortfolioHolding[] {
 
 export function writePortfolio(holdings: PortfolioHolding[]) {
   writeJson(PORTFOLIO_KEY, holdings);
+}
+
+export function readSavedWatchlists(): SavedWatchlist[] {
+  return readJson<SavedWatchlist[]>(WATCHLISTS_KEY, []);
+}
+
+export function writeSavedWatchlists(watchlists: SavedWatchlist[]) {
+  writeJson(WATCHLISTS_KEY, watchlists);
+}
+
+export function readReportHistory(): ReportLog[] {
+  return readJson<ReportLog[]>(REPORT_HISTORY_KEY, []);
+}
+
+export function writeReportHistory(history: ReportLog[]) {
+  writeJson(REPORT_HISTORY_KEY, history);
+}
+
+export function appendReportLog(log: Omit<ReportLog, "id" | "generatedAt">) {
+  const history = readReportHistory();
+  const next = [
+    {
+      id: makeId(),
+      generatedAt: new Date().toISOString(),
+      ...log,
+    },
+    ...history,
+  ].slice(0, 50);
+  writeReportHistory(next);
+  return next;
 }
 
 export function makeId() {

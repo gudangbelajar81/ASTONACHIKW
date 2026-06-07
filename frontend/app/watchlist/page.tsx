@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import Sidebar from "../../components/Sidebar";
+import { SavedWatchlist, makeId, readSavedWatchlists, writeSavedWatchlists } from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -28,6 +30,9 @@ export default function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [saveName, setSaveName] = useState("My Watchlist");
+  const [savedMessage, setSavedMessage] = useState("");
+  const [ready, setReady] = useState(false);
 
   async function loadWatchlist(nextTickers: string) {
     setLoading(true);
@@ -49,12 +54,47 @@ export default function WatchlistPage() {
   }
 
   useEffect(() => {
+    const queryTickers = new URLSearchParams(window.location.search).get("tickers");
+    if (queryTickers) {
+      const normalized = queryTickers
+        .split(",")
+        .map((value) => value.trim().toUpperCase())
+        .filter(Boolean)
+        .join(",");
+      setInput(normalized);
+      setTickers(normalized);
+    }
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !tickers) return;
     void loadWatchlist(tickers);
-  }, [tickers]);
+  }, [ready, tickers]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setTickers(input);
+  }
+
+  function saveCurrentWatchlist() {
+    const currentTickers = tickers
+      .split(",")
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+    if (!currentTickers.length) return;
+
+    const saved: SavedWatchlist[] = readSavedWatchlists();
+    writeSavedWatchlists([
+      {
+        id: makeId(),
+        name: saveName.trim() || "Saved Watchlist",
+        tickers: currentTickers,
+        createdAt: new Date().toISOString(),
+      },
+      ...saved,
+    ]);
+    setSavedMessage(`Watchlist "${saveName}" tersimpan.`);
   }
 
   return (
@@ -72,6 +112,17 @@ export default function WatchlistPage() {
               {loading ? "Memuat" : "Scan"}
             </button>
           </form>
+        </div>
+
+        <div className="watchlist-savebar">
+          <input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="Nama watchlist" />
+          <button type="button" onClick={saveCurrentWatchlist} disabled={!tickers.trim()}>
+            Simpan Watchlist
+          </button>
+          <Link href="/lists" className="watchlist-savebar__link">
+            Buka Pustaka
+          </Link>
+          {savedMessage ? <span>{savedMessage}</span> : null}
         </div>
 
         {error ? <div className="dashboard-alert">{error}</div> : null}
