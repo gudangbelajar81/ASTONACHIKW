@@ -38,6 +38,7 @@ async def get_market_analysis(request: AnalystRequestBody) -> AnalystResponse:
             ai_provider_order=request.ai_provider_order,
             ai_api_keys=request.ai_api_keys,
             ai_models=request.ai_models,
+            data_context=request.data_context,
         )
 
         # Generate analysis

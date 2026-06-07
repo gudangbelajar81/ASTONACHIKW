@@ -6,7 +6,10 @@ from openai import OpenAI, APIError
 from backend.app.core.config import settings
 
 AI_SYSTEM_MESSAGE = (
-    "Anda adalah analis pasar ahli untuk trader ritel di Asia. "
+    "Anda adalah narator data pasar untuk trader ritel di Asia. "
+    "Anda tidak boleh menebak, mengarang harga, atau membuat prediksi tanpa data. "
+    "Gunakan hanya data yang diberikan: OHLCV, indikator teknikal, bandarmology, macro, sentiment, "
+    "backtest result, dan score components. Jika data tidak cukup, katakan data tidak cukup. "
     "Selalu jawab dalam Bahasa Indonesia yang jelas, ringkas, dan dapat ditindaklanjuti."
 )
 
@@ -21,6 +24,7 @@ class AnalystInput:
         ai_provider_order: Optional[List[str]] = None,
         ai_api_keys: Optional[Dict[str, List[str]]] = None,
         ai_models: Optional[Dict[str, str]] = None,
+        data_context: Optional[Dict[str, Any]] = None,
     ):
         self.ticker = ticker
         self.composite_cycle_data = composite_cycle_data
@@ -29,6 +33,7 @@ class AnalystInput:
         self.ai_provider_order = ai_provider_order or []
         self.ai_api_keys = ai_api_keys or {}
         self.ai_models = ai_models or {}
+        self.data_context = data_context or {}
 
 
 class AnalystOutput:
@@ -100,11 +105,27 @@ def format_analyst_prompt(analyst_input: AnalystInput) -> str:
             ]
         )
 
-    prompt = f"""Anda adalah analis pasar ahli yang berfokus pada analisis siklus astrologi.
+    context_json = json.dumps(analyst_input.data_context, ensure_ascii=False, indent=2, default=str)
+    has_structured_context = bool(analyst_input.data_context)
+
+    prompt = f"""Anda adalah NARATOR DATA, bukan peramal dan bukan penebak.
+
+ATURAN WAJIB:
+- Jangan membuat prediksi tanpa data.
+- Gunakan hanya data yang diberikan di bagian DATA TERSTRUKTUR dan DATA SIKLUS.
+- Data yang boleh dipakai hanya: OHLCV, indikator teknikal, bandarmology, macro, sentiment, backtest result, dan score components.
+- Jangan menambah harga, target, stop loss, probabilitas, alasan, atau risiko yang tidak ada di data.
+- Jelaskan alasan sinyal, risiko, invalidation, dan skenario hanya jika data tersedia.
+- Jika data tidak cukup, tulis dengan jelas: "Data tidak cukup untuk membuat analisis yang bertanggung jawab."
+- AI Analyst harus menjadi narator data, bukan penebak.
 
 Analisis data pasar berikut dan berikan penjelasan yang mudah dipahami dalam Bahasa Indonesia:
 
 MARKET TICKER: {analyst_input.ticker}
+
+DATA TERSTRUKTUR TERSEDIA: {"YA" if has_structured_context else "TIDAK"}
+DATA TERSTRUKTUR:
+{context_json if has_structured_context else "{}"}
 
 COMPOSITE CYCLE DATA (Last 30 days):
 Dates: {', '.join(str(d) for d in cycle_dates[-10:])}
@@ -123,11 +144,11 @@ Berikan analisis dalam format berikut. Gunakan judul bagian persis seperti ini a
 2. **Cycle Explanation** (2-3 kalimat): Jelaskan tren siklus komposit dan maknanya untuk pasar
 3. **Turning Points Explanation** (2-3 kalimat): Analisis puncak/dasar terbaru dan signifikansinya
 4. **Scanner Insights** (2-3 kalimat): Sorot kombinasi planet terkuat dan nilai prediktifnya
-5. **Market Outlook** (2-3 kalimat): Berikan pandangan ke depan berdasarkan semua sinyal
+5. **Market Outlook** (2-3 kalimat): Jelaskan skenario, risiko, dan invalidation berdasarkan data. Jika data tidak cukup, katakan data tidak cukup.
 
 Wajib jawab dalam Bahasa Indonesia.
-Tetap spesifik tentang tanggal, nama siklus (misalnya "Venus-Jupiter"), dan potensi pergerakan harga.
-Gunakan bahasa yang mudah dipahami trader ritel berpengalaman."""
+Tetap spesifik tentang data yang tersedia.
+Jangan memberikan rekomendasi beli/jual jika data pendukung tidak tersedia."""
 
     return prompt
 
@@ -183,7 +204,7 @@ def call_openai_compatible(
             {"role": "system", "content": AI_SYSTEM_MESSAGE},
             {"role": "user", "content": prompt},
         ],
-        temperature=0.7,
+        temperature=0.1,
         max_tokens=1500,
     )
     return message.choices[0].message.content or ""
@@ -194,7 +215,7 @@ def call_gemini(*, api_key: str, model: str, prompt: str) -> str:
     payload = {
         "systemInstruction": {"parts": [{"text": AI_SYSTEM_MESSAGE}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1500},
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1500},
     }
     request = urllib.request.Request(
         url,
@@ -224,7 +245,7 @@ def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
     payload = {
         "model": model,
         "max_tokens": 1500,
-        "temperature": 0.7,
+        "temperature": 0.1,
         "system": AI_SYSTEM_MESSAGE,
         "messages": [
             {
@@ -256,6 +277,71 @@ def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def local_analysis(analyst_input: AnalystInput) -> AnalystOutput:
+    context = analyst_input.data_context or {}
+    score_components = context.get("score_components") or context.get("score_breakdown") or {}
+    backtest = context.get("backtest_result") or context.get("backtest") or {}
+    scenario = context.get("scenario") or {}
+    data_quality = context.get("data_quality") or {}
+    has_enough_data = bool(context) and (bool(score_components) or bool(backtest) or bool(scenario))
+
+    if not has_enough_data:
+        message = (
+            "Data tidak cukup untuk membuat analisis yang bertanggung jawab. "
+            "AI Analyst membutuhkan OHLCV/indikator teknikal, bandarmology, macro, sentiment, backtest result, "
+            "atau score components sebelum menarasikan sinyal."
+        )
+        return AnalystOutput(
+            ticker=analyst_input.ticker,
+            summary=message,
+            cycle_explanation="Data siklus saja tidak cukup untuk membuat narasi prediksi harga.",
+            turning_points_explanation="Titik balik hanya boleh dipakai sebagai konteks tambahan jika didukung data harga dan risiko.",
+            scan_explanation="Scanner tidak boleh menjadi dasar tunggal keputusan tanpa validasi backtest dan komponen skor.",
+            outlook="Data tidak cukup. Tidak ada skenario, risiko, atau invalidation yang dapat dinarasikan secara bertanggung jawab.",
+        )
+
+    signal = context.get("signal") or context.get("recommended_action") or "belum ada sinyal eksplisit"
+    confidence = context.get("confidence", "tidak tersedia")
+    risks = context.get("main_risks") or context.get("risks") or []
+    reasons = context.get("main_reasons") or context.get("reasons") or []
+    invalidation = scenario.get("invalidation_level") or context.get("stop_loss")
+    target = scenario.get("bullish_target") or context.get("target_1")
+    entry = scenario.get("entry_zone_low") or context.get("entry_zone")
+
+    if isinstance(entry, list):
+        entry_text = " - ".join(str(value) for value in entry[:2])
+    else:
+        entry_text = str(entry) if entry is not None else "tidak tersedia"
+
+    risk_text = "; ".join(str(item) for item in risks[:3]) if risks else "Risiko spesifik belum tersedia di data."
+    reason_text = "; ".join(str(item) for item in reasons[:3]) if reasons else "Alasan sinyal belum tersedia di data."
+    sample_count = backtest.get("sample_count") or context.get("validation", {}).get("sample_size")
+
+    return AnalystOutput(
+        ticker=analyst_input.ticker,
+        summary=(
+            f"Sinyal data untuk {analyst_input.ticker}: {signal}, dengan confidence {confidence}. "
+            f"Ringkasan ini hanya menarasikan komponen data yang tersedia."
+        ),
+        cycle_explanation=(
+            f"Alasan utama dari score components: {reason_text} "
+            f"Kualitas data: {json.dumps(data_quality, ensure_ascii=False) if data_quality else 'belum lengkap'}."
+        ),
+        turning_points_explanation=(
+            f"Invalidation/stop loss yang tersedia: {invalidation if invalidation is not None else 'belum tersedia'}. "
+            "Jika level ini ditembus, skenario harus dianggap batal atau perlu dihitung ulang."
+        ),
+        scan_explanation=(
+            f"Backtest sample: {sample_count if sample_count is not None else 'belum tersedia'}. "
+            "Komponen skor dan backtest dipakai sebagai bukti pendukung, bukan jaminan hasil."
+        ),
+        outlook=(
+            f"Skenario data: entry {entry_text}, target {target if target is not None else 'belum tersedia'}, "
+            f"risiko utama: {risk_text}"
+        ),
+    )
+
+
+def legacy_cycle_analysis(analyst_input: AnalystInput) -> AnalystOutput:
     recent_cycle = analyst_input.composite_cycle_data[-30:] if analyst_input.composite_cycle_data else []
     latest_value = recent_cycle[-1].get("value", 0) if recent_cycle else 0
     previous_value = recent_cycle[-7].get("value", latest_value) if len(recent_cycle) >= 7 else latest_value
@@ -404,6 +490,16 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
 
     Falls back to local analysis when no provider is configured or all providers fail.
     """
+    context = analyst_input.data_context or {}
+    if not context or not (
+        context.get("score_components")
+        or context.get("score_breakdown")
+        or context.get("backtest_result")
+        or context.get("backtest")
+        or context.get("scenario")
+    ):
+        return local_analysis(analyst_input)
+
     prompt = format_analyst_prompt(analyst_input)
     errors = []
 

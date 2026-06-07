@@ -249,6 +249,34 @@ export default function DashboardPage() {
               accuracy: result.accuracy,
               score: result.score,
             })),
+            data_context: prediction
+              ? {
+                  signal: prediction.signal,
+                  confidence: prediction.confidence,
+                  expected_return: prediction.expected_return,
+                  probability_up: prediction.probability_up,
+                  risk_label: prediction.risk_label,
+                  technical_indicators: {
+                    regime: prediction.regime,
+                    factors: prediction.factors,
+                  },
+                  macro: prediction.macro,
+                  sentiment: prediction.sentiment,
+                  scenario: prediction.scenario,
+                  backtest_result: prediction.backtest,
+                  score_components: Object.fromEntries(
+                    prediction.factors.map((factor) => [factor.name, factor.contribution])
+                  ),
+                  data_quality: {
+                    ohlcv_available: true,
+                    technical_available: prediction.factors.length > 0,
+                    bandarmology_available: false,
+                    macro_available: Boolean(prediction.macro),
+                    sentiment_available: Boolean(prediction.sentiment),
+                    backtest_available: Boolean(prediction.backtest),
+                  },
+                }
+              : null,
             ...buildAiRequestConfig(readApiProviders()),
           }),
         });

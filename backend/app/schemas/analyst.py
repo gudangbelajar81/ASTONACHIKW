@@ -41,6 +41,10 @@ class AnalystRequestBody(BaseModel):
     ai_models: Optional[Dict[str, str]] = Field(
         default=None, description="User-selected AI model by provider"
     )
+    data_context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Structured market context: OHLCV/technical/bandarmology/macro/sentiment/backtest/score components",
+    )
 
 
 class AnalystKeyTestRequest(BaseModel):
