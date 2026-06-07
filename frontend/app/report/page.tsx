@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
-import { appendReportLog } from "../../lib/userData";
+import { appendReportLog, appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -144,6 +144,7 @@ export default function ReportPage() {
         regime: nextReport.prediction.regime.label,
         confidence: nextReport.prediction.confidence,
       });
+      appendUsageEvent({ action: "report_generate", ticker: nextTicker, source: "report" });
     } catch (exc) {
       setReport(null);
       setError(exc instanceof Error ? exc.message : "Gagal membuat report strategi.");
@@ -158,7 +159,7 @@ export default function ReportPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedTicker = tickerInput.trim().toUpperCase();
+    const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
     if (normalizedTicker) setTicker(normalizedTicker);
   }
 

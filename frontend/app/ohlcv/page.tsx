@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ColorType, createChart, ISeriesApi, Time } from "lightweight-charts";
 import Sidebar from "../../components/Sidebar";
+import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -66,6 +67,7 @@ export default function OHLCVPage() {
         throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
       }
       setReport((await response.json()) as OHLCVReport);
+      appendUsageEvent({ action: "ohlcv_load", ticker: nextTicker, source: "ohlcv" });
     } catch (exc) {
       setReport(null);
       setError(exc instanceof Error ? exc.message : "Gagal membaca OHLCV.");
@@ -152,7 +154,7 @@ export default function OHLCVPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedTicker = tickerInput.trim().toUpperCase();
+    const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
     if (normalizedTicker) setTicker(normalizedTicker);
   }
 

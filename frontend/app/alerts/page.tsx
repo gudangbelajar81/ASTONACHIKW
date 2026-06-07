@@ -2,7 +2,16 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
-import { AlertCondition, UserAlert, makeId, readAlerts, writeAlerts } from "../../lib/userData";
+import {
+  AlertCondition,
+  UserAlert,
+  appendUsageEvent,
+  makeId,
+  normalizeTickerForMarket,
+  readAlerts,
+  readMarketMode,
+  writeAlerts,
+} from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -60,17 +69,19 @@ export default function AlertsPage() {
 
   function addAlert(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const nextTicker = normalizeTickerForMarket(ticker, readMarketMode());
     save([
       ...alerts,
       {
         id: makeId(),
-        ticker: ticker.trim().toUpperCase(),
+        ticker: nextTicker,
         condition,
         operator,
         target,
         enabled: true,
       },
     ]);
+    appendUsageEvent({ action: "alert_add", ticker: nextTicker, source: "alerts" });
   }
 
   async function checkAlerts() {
@@ -85,6 +96,7 @@ export default function AlertsPage() {
         nextResults.push(evaluateAlert(alert, prediction));
       }
       setResults(nextResults);
+      appendUsageEvent({ action: "alert_check", ticker: ticker.trim().toUpperCase(), source: "alerts" });
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : "Gagal mengecek alert.");
     } finally {

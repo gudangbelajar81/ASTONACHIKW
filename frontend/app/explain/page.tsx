@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -41,6 +42,7 @@ export default function ExplainPage() {
         throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
       }
       setPrediction((await response.json()) as Prediction);
+      appendUsageEvent({ action: "explain_load", ticker: nextTicker, source: "explain" });
     } catch (exc) {
       setPrediction(null);
       setError(exc instanceof Error ? exc.message : "Gagal membaca explainability.");
@@ -55,7 +57,7 @@ export default function ExplainPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedTicker = tickerInput.trim().toUpperCase();
+    const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
     if (normalizedTicker) setTicker(normalizedTicker);
   }
 

@@ -3,7 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import Sidebar from "../../components/Sidebar";
-import { SavedWatchlist, makeId, readSavedWatchlists, writeSavedWatchlists } from "../../lib/userData";
+import {
+  SavedWatchlist,
+  appendUsageEvent,
+  makeId,
+  normalizeTickerList,
+  readMarketMode,
+  readSavedWatchlists,
+  writeSavedWatchlists,
+} from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -33,6 +41,7 @@ export default function WatchlistPage() {
   const [saveName, setSaveName] = useState("My Watchlist");
   const [savedMessage, setSavedMessage] = useState("");
   const [ready, setReady] = useState(false);
+  const [marketMode, setMarketMode] = useState<"us" | "id">("us");
 
   async function loadWatchlist(nextTickers: string) {
     setLoading(true);
@@ -54,13 +63,10 @@ export default function WatchlistPage() {
   }
 
   useEffect(() => {
+    setMarketMode(readMarketMode());
     const queryTickers = new URLSearchParams(window.location.search).get("tickers");
     if (queryTickers) {
-      const normalized = queryTickers
-        .split(",")
-        .map((value) => value.trim().toUpperCase())
-        .filter(Boolean)
-        .join(",");
+      const normalized = normalizeTickerList(queryTickers, readMarketMode()).join(",");
       setInput(normalized);
       setTickers(normalized);
     }
@@ -74,14 +80,12 @@ export default function WatchlistPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setTickers(input);
+    setTickers(normalizeTickerList(input, marketMode).join(","));
+    appendUsageEvent({ action: "watchlist_scan", ticker: input.split(",")[0]?.trim().toUpperCase() ?? "", source: "watchlist" });
   }
 
   function saveCurrentWatchlist() {
-    const currentTickers = tickers
-      .split(",")
-      .map((value) => value.trim().toUpperCase())
-      .filter(Boolean);
+    const currentTickers = normalizeTickerList(tickers, marketMode);
     if (!currentTickers.length) return;
 
     const saved: SavedWatchlist[] = readSavedWatchlists();
@@ -95,6 +99,7 @@ export default function WatchlistPage() {
       ...saved,
     ]);
     setSavedMessage(`Watchlist "${saveName}" tersimpan.`);
+    appendUsageEvent({ action: "watchlist_save", ticker: currentTickers[0], source: "watchlist" });
   }
 
   return (

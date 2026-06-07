@@ -32,10 +32,37 @@ export type ReportLog = {
   confidence: string;
 };
 
+export type MarketMode = "us" | "id";
+
+export type PlanTier = "free" | "pro";
+
+export type PlanProfile = {
+  tier: PlanTier;
+  dailyApiLimit: number;
+  monthlyReportLimit: number;
+};
+
+export type UsageEvent = {
+  id: string;
+  action: string;
+  ticker: string;
+  source: string;
+  createdAt: string;
+};
+
 const ALERTS_KEY = "astrocycle_user_alerts";
 const PORTFOLIO_KEY = "astrocycle_portfolio_holdings";
 const WATCHLISTS_KEY = "astrocycle_saved_watchlists";
 const REPORT_HISTORY_KEY = "astrocycle_report_history";
+const MARKET_MODE_KEY = "astrocycle_market_mode";
+const USAGE_LOG_KEY = "astrocycle_usage_log";
+const PLAN_PROFILE_KEY = "astrocycle_plan_profile";
+
+const DEFAULT_PLAN_PROFILE: PlanProfile = {
+  tier: "free",
+  dailyApiLimit: 50,
+  monthlyReportLimit: 100,
+};
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -98,4 +125,76 @@ export function appendReportLog(log: Omit<ReportLog, "id" | "generatedAt">) {
 
 export function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export function readMarketMode(): MarketMode {
+  return readJson<MarketMode>(MARKET_MODE_KEY, "us");
+}
+
+export function writeMarketMode(mode: MarketMode) {
+  writeJson(MARKET_MODE_KEY, mode);
+}
+
+export function normalizeTickerForMarket(value: string, mode: MarketMode = readMarketMode()) {
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) return "";
+  if (mode === "id" && !normalized.includes(".")) {
+    return `${normalized}.JK`;
+  }
+  return normalized;
+}
+
+export function normalizeTickerList(raw: string, mode: MarketMode = readMarketMode()) {
+  return raw
+    .split(",")
+    .map((value) => normalizeTickerForMarket(value, mode))
+    .filter(Boolean);
+}
+
+export function readPlanProfile(): PlanProfile {
+  return readJson<PlanProfile>(PLAN_PROFILE_KEY, DEFAULT_PLAN_PROFILE);
+}
+
+export function writePlanProfile(profile: PlanProfile) {
+  writeJson(PLAN_PROFILE_KEY, profile);
+}
+
+export function readUsageLog(): UsageEvent[] {
+  return readJson<UsageEvent[]>(USAGE_LOG_KEY, []);
+}
+
+export function appendUsageEvent(event: Omit<UsageEvent, "id" | "createdAt">) {
+  const history = readUsageLog();
+  const next = [
+    {
+      id: makeId(),
+      createdAt: new Date().toISOString(),
+      ...event,
+    },
+    ...history,
+  ].slice(0, 200);
+  writeJson(USAGE_LOG_KEY, next);
+  return next;
+}
+
+export function exportUserData() {
+  return {
+    alerts: readAlerts(),
+    portfolio: readPortfolio(),
+    watchlists: readSavedWatchlists(),
+    reports: readReportHistory(),
+    usage: readUsageLog(),
+    marketMode: readMarketMode(),
+    planProfile: readPlanProfile(),
+  };
+}
+
+export function importUserData(payload: Partial<ReturnType<typeof exportUserData>>) {
+  if (payload.alerts) writeAlerts(payload.alerts);
+  if (payload.portfolio) writePortfolio(payload.portfolio);
+  if (payload.watchlists) writeSavedWatchlists(payload.watchlists);
+  if (payload.reports) writeReportHistory(payload.reports);
+  if (payload.usage) writeJson(USAGE_LOG_KEY, payload.usage);
+  if (payload.marketMode) writeMarketMode(payload.marketMode);
+  if (payload.planProfile) writePlanProfile(payload.planProfile);
 }

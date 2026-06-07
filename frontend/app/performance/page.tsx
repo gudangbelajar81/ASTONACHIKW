@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -100,6 +101,7 @@ export default function PerformancePage() {
         throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
       }
       setReport((await response.json()) as PerformanceReport);
+      appendUsageEvent({ action: "performance_load", ticker: nextTicker, source: "performance" });
     } catch (exc) {
       setReport(null);
       setError(exc instanceof Error ? exc.message : "Gagal mengambil performance report.");
@@ -120,6 +122,7 @@ export default function PerformancePage() {
         throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
       }
       await loadReport(ticker);
+      appendUsageEvent({ action: "model_train", ticker, source: "performance" });
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : "Gagal melatih ulang bobot model.");
     } finally {
@@ -133,7 +136,7 @@ export default function PerformancePage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedTicker = tickerInput.trim().toUpperCase();
+    const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
     if (normalizedTicker) setTicker(normalizedTicker);
   }
 

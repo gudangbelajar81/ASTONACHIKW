@@ -2,7 +2,15 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
-import { PortfolioHolding, makeId, readPortfolio, writePortfolio } from "../../lib/userData";
+import {
+  PortfolioHolding,
+  appendUsageEvent,
+  makeId,
+  normalizeTickerForMarket,
+  readMarketMode,
+  readPortfolio,
+  writePortfolio,
+} from "../../lib/userData";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
@@ -63,6 +71,7 @@ export default function PortfolioPage() {
         });
       }
       setEnriched(rows);
+      appendUsageEvent({ action: "portfolio_refresh", ticker: nextHoldings[0]?.ticker ?? "", source: "portfolio" });
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : "Gagal memuat portfolio.");
     } finally {
@@ -82,13 +91,14 @@ export default function PortfolioPage() {
       ...holdings,
       {
         id: makeId(),
-        ticker: ticker.trim().toUpperCase(),
+        ticker: normalizeTickerForMarket(ticker, readMarketMode()),
         shares: Number(shares),
         averagePrice: Number(averagePrice),
       },
     ];
     save(nextHoldings);
     void refreshPortfolio(nextHoldings);
+    appendUsageEvent({ action: "portfolio_add", ticker, source: "portfolio" });
   }
 
   const totals = useMemo(() => {

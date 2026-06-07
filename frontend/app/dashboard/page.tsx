@@ -14,6 +14,7 @@ import {
   TurningPoint,
 } from "../../lib/demoData";
 import { buildAiRequestConfig, readApiProviders } from "../../lib/apiKeys";
+import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 type ScannerResponse = {
   top_combinations: ScannerResult[];
@@ -228,6 +229,7 @@ export default function DashboardPage() {
       setDataMode("live");
       setData({ composite, scanner, turningPoints, prediction, analysis: null });
       setLoading(false);
+      appendUsageEvent({ action: "dashboard_load", ticker: nextTicker, source: "dashboard" });
 
       try {
         const analysis = await readJson<AnalystSummary>(`${API_BASE_URL}/api/analyst`, {
@@ -252,6 +254,7 @@ export default function DashboardPage() {
         });
 
         setData({ composite, scanner, turningPoints, prediction, analysis });
+        appendUsageEvent({ action: "analyst_run", ticker: nextTicker, source: "dashboard" });
       } catch (analystError) {
         setAnalysisError(analystError instanceof Error ? analystError.message : "Analisis AI belum tersedia");
       }
@@ -311,7 +314,7 @@ export default function DashboardPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedTicker = tickerInput.trim().toUpperCase();
+    const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
     if (normalizedTicker) setTicker(normalizedTicker);
   }
 
