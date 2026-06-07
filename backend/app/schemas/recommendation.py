@@ -42,6 +42,7 @@ class RecommendationResponse(BaseModel):
     final_score: int
     signal: str
     confidence: float
+    calibrated_probability: float | None = None
     last_price: float
     entry_zone: list[float]
     target_1: float
@@ -49,6 +50,8 @@ class RecommendationResponse(BaseModel):
     stop_loss: float
     risk_reward: float
     score_breakdown: dict[str, int]
+    technical_indicators: dict | None = None
+    bandarmology_components: dict | None = None
     main_reasons: list[str]
     main_risks: list[str]
     price_context: RecommendationPriceContext

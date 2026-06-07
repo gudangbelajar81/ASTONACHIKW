@@ -64,6 +64,7 @@ class ScreenerItem(BaseModel):
     symbol: str
     final_score: int
     signal: str
+    calibrated_probability: float | None = None
     horizon: str
     last_price: float
     entry_zone: list[float]

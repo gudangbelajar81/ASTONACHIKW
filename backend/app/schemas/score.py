@@ -35,6 +35,7 @@ class PredictionScoreResponse(BaseModel):
     final_score: int
     signal: str
     confidence: float
+    calibrated_probability: float
     last_price: float
     entry_zone: list[float]
     target_1: float
@@ -42,6 +43,8 @@ class PredictionScoreResponse(BaseModel):
     stop_loss: float
     risk_reward: float
     score_components: dict[str, ScoreMetric]
+    technical_indicators: dict
+    bandarmology_components: dict
     main_reasons: list[str]
     main_risks: list[str]
     invalidation: str

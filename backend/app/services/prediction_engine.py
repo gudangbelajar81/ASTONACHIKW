@@ -806,6 +806,130 @@ def _max_drawdown(close: pd.Series) -> float:
     return float(drawdown.min()) if len(drawdown) else 0.0
 
 
+def calibrated_probability_from_score(score: int) -> float:
+    if score >= 90:
+        return 0.72
+    if score >= 80:
+        return 0.68
+    if score >= 70:
+        return 0.63
+    if score >= 60:
+        return 0.56
+    if score >= 50:
+        return 0.51
+    return 0.46
+
+
+def _scale_unit(value: float, lower: float = -1.0, upper: float = 1.0) -> float:
+    if upper == lower:
+        return 0.0
+    return clamp((value - lower) / (upper - lower), 0.0, 1.0)
+
+
+def calculate_rsi(close: pd.Series, period: int = 14) -> float:
+    delta = close.diff()
+    gain = delta.clip(lower=0).rolling(period, min_periods=period).mean()
+    loss = (-delta.clip(upper=0)).rolling(period, min_periods=period).mean()
+    rs = gain / loss.replace(0, 0.000001)
+    return _safe_float(100 - (100 / (1 + rs.iloc[-1])), 50.0)
+
+
+def calculate_macd(close: pd.Series) -> tuple[float, float, float]:
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+    macd = ema12 - ema26
+    signal = macd.ewm(span=9, adjust=False).mean()
+    histogram = macd - signal
+    return _safe_float(macd.iloc[-1]), _safe_float(signal.iloc[-1]), _safe_float(histogram.iloc[-1])
+
+
+def calculate_atr(enriched: pd.DataFrame, period: int = 14) -> float:
+    high = enriched["high"].astype(float)
+    low = enriched["low"].astype(float)
+    close = enriched["close"].astype(float)
+    true_range = pd.concat(
+        [
+            high - low,
+            (high - close.shift()).abs(),
+            (low - close.shift()).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    return _safe_float(true_range.rolling(period, min_periods=period).mean().iloc[-1], _safe_float(high.iloc[-1] - low.iloc[-1]))
+
+
+def calculate_vwap(enriched: pd.DataFrame, window: int = 20) -> float:
+    recent = enriched.tail(window)
+    typical = (recent["high"].astype(float) + recent["low"].astype(float) + recent["close"].astype(float)) / 3
+    volume = recent["volume"].astype(float)
+    total_volume = _safe_float(volume.sum())
+    if total_volume <= 0:
+        return _safe_float(recent["close"].iloc[-1])
+    return _safe_float((typical * volume).sum() / total_volume)
+
+
+def calculate_ichimoku(enriched: pd.DataFrame) -> dict[str, float]:
+    high = enriched["high"].astype(float)
+    low = enriched["low"].astype(float)
+    tenkan = (_safe_float(high.tail(9).max()) + _safe_float(low.tail(9).min())) / 2
+    kijun = (_safe_float(high.tail(26).max()) + _safe_float(low.tail(26).min())) / 2
+    span_a = (tenkan + kijun) / 2
+    span_b = (_safe_float(high.tail(52).max()) + _safe_float(low.tail(52).min())) / 2
+    return {"tenkan": tenkan, "kijun": kijun, "span_a": span_a, "span_b": span_b}
+
+
+def build_expanded_technical_context(enriched: pd.DataFrame, latest_close: float, ma20: float, ma50: float, ma200: float) -> dict:
+    close = enriched["close"].astype(float)
+    high = enriched["high"].astype(float)
+    low = enriched["low"].astype(float)
+    open_ = enriched["open"].astype(float)
+    atr = calculate_atr(enriched)
+    atr_pct = atr / latest_close if latest_close > 0 else 0.0
+    rsi = calculate_rsi(close)
+    macd, macd_signal, macd_hist = calculate_macd(close)
+    vwap = calculate_vwap(enriched)
+    ichimoku = calculate_ichimoku(enriched)
+    resistance_30 = _safe_float(high.tail(30).max(), latest_close)
+    support_30 = _safe_float(low.tail(30).min(), latest_close)
+    breakout_distance = latest_close / resistance_30 - 1 if resistance_30 > 0 else 0.0
+    previous_close = _safe_float(close.iloc[-2], latest_close) if len(close) >= 2 else latest_close
+    gap_pct = (_safe_float(open_.iloc[-1], latest_close) / previous_close - 1) if previous_close > 0 else 0.0
+    fib_low = _safe_float(low.tail(60).min(), latest_close)
+    fib_high = _safe_float(high.tail(60).max(), latest_close)
+    fib_position = (latest_close - fib_low) / max(fib_high - fib_low, 0.01)
+    ichimoku_bullish = latest_close > max(ichimoku["span_a"], ichimoku["span_b"]) and ichimoku["tenkan"] >= ichimoku["kijun"]
+
+    trend_points = 0.0
+    trend_points += 0.22 if ma20 > ma50 else 0
+    trend_points += 0.16 if ma50 > ma200 else 0
+    trend_points += 0.14 if latest_close > ma20 else 0
+    trend_points += 0.12 if breakout_distance >= -0.03 else 0
+    trend_points += 0.12 if 45 <= rsi <= 70 else 0.04 if rsi > 70 else 0
+    trend_points += 0.10 if macd_hist > 0 else 0
+    trend_points += 0.07 if atr_pct <= 0.045 else 0.03 if atr_pct <= 0.075 else 0
+    trend_points += 0.07 if latest_close > vwap else 0
+    trend_points += 0.05 if fib_position >= 0.5 else 0
+    trend_points += 0.05 if ichimoku_bullish else 0
+    trend_points -= 0.08 if gap_pct < -0.025 else 0
+
+    return {
+        "score": clamp(trend_points, 0, 1),
+        "rsi": round(rsi, 2),
+        "macd": round(macd, 4),
+        "macd_signal": round(macd_signal, 4),
+        "macd_histogram": round(macd_hist, 4),
+        "atr": round(atr, 4),
+        "atr_pct": round(atr_pct, 4),
+        "vwap": round(vwap, 2),
+        "breakout_distance": round(breakout_distance, 4),
+        "gap_pct": round(gap_pct, 4),
+        "fib_position": round(fib_position, 4),
+        "ichimoku_bullish": ichimoku_bullish,
+        "support": support_30,
+        "resistance": resistance_30,
+    }
+
+
 async def build_idx_recommendation(
     session: AsyncSession,
     ticker: str,
@@ -829,10 +953,12 @@ async def build_idx_recommendation(
     ma20 = _safe_float(latest.ma20, latest_close)
     ma50 = _safe_float(latest.ma50, latest_close)
     ma200 = _safe_float(latest.ma200, latest_close)
-    support = _safe_float(enriched["low"].tail(30).min(), latest_close * 0.96)
-    resistance = _safe_float(enriched["high"].tail(30).max(), latest_close * 1.04)
+    technical_context = build_expanded_technical_context(enriched, latest_close, ma20, ma50, ma200)
+    support = _safe_float(technical_context["support"], latest_close * 0.96)
+    resistance = _safe_float(technical_context["resistance"], latest_close * 1.04)
     volume_5 = _safe_float(volume.tail(5).mean())
     volume_20 = _safe_float(volume.tail(20).mean())
+    value_20 = volume_20 * _safe_float(close.tail(20).mean(), latest_close)
     volume_ratio = volume_5 / volume_20 if volume_20 > 0 else 1.0
 
     selected_provider = None
@@ -858,22 +984,31 @@ async def build_idx_recommendation(
     except Exception:
         stock_return = _pct_change(close, horizon_days)
 
-    technical_score = 0
-    technical_score += 8 if ma20 > ma50 else 0
-    technical_score += 5 if ma50 > ma200 else 0
-    technical_score += 5 if latest_close > ma20 else 0
-    technical_score += 4 if stock_return > 0 else 0
-    technical_score += 3 if resistance > latest_close else 0
-    technical_score = min(25, technical_score)
-
-    volume_score = min(15, max(0, round((volume_ratio - 0.8) / 0.8 * 15)))
-    relative_strength_score = min(15, max(0, round((relative_strength + 0.04) / 0.12 * 15)))
+    trend_score = round(technical_context["score"] * 20)
+    momentum_score = round(clamp((stock_return + 0.04) / 0.12, 0, 1) * 15)
+    liquidity_unit = min(1.0, value_20 / 5_000_000_000) if market == "id" else 1.0
+    volume_unit = clamp((volume_ratio - 0.8) / 0.8, 0, 1)
+    volume_liquidity_score = round((volume_unit * 0.65 + liquidity_unit * 0.35) * 15)
+    relative_strength_score = min(10, max(0, round((relative_strength + 0.04) / 0.12 * 10)))
     smart_money = _safe_float(bandarmology.get("smart_money_score"))
-    bandar_score = min(20, max(0, round((smart_money + 1) / 2 * 20)))
+    normalized_provider_data = bandarmology.get("normalized_provider_data") or {}
+    broker_accumulation_raw = _safe_float(normalized_provider_data.get("broker_accumulation_score"), 50.0)
+    broker_accumulation_unit = clamp(broker_accumulation_raw / 100, 0, 1)
+    net_buy_value = _safe_float(normalized_provider_data.get("net_buy_value"))
+    foreign_flow_unit = 0.5
+    if value_20 > 0 and net_buy_value:
+        foreign_flow_unit = clamp((net_buy_value / value_20 + 0.05) / 0.1, 0, 1)
+    smart_money_component = min(15, max(0, round((smart_money + 1) / 2 * 15)))
+    broker_accumulation_component = min(10, max(0, round(broker_accumulation_unit * 10)))
+    foreign_flow_component = min(5, max(0, round(foreign_flow_unit * 5)))
+    bandarmology_score = min(20, max(0, round((smart_money_component + broker_accumulation_component + foreign_flow_component) / 30 * 20)))
     if bandarmology.get("verdict") == "akumulasi":
-        bandar_score = min(20, bandar_score + 3)
+        bandarmology_score = min(20, bandarmology_score + 2)
     if bandarmology.get("verdict") == "distribusi":
-        bandar_score = max(0, bandar_score - 5)
+        bandarmology_score = max(0, bandarmology_score - 4)
+    macro_score = 10 if macro_available and relative_strength >= -0.02 else 4 if macro_available else 0
+    sentiment_score = 3
+    astro_cycle_score = 3
 
     atr_proxy = _safe_float((enriched["high"].astype(float) - enriched["low"].astype(float)).tail(14).mean(), latest_close * 0.025)
     stop_loss = min(support, latest_close - atr_proxy * 1.2)
@@ -886,19 +1021,23 @@ async def build_idx_recommendation(
     risk_per_share = max(entry_high - stop_loss, 0.01)
     reward_per_share = max(target_1 - entry_high, 0.01)
     risk_reward = round(reward_per_share / risk_per_share, 2)
-    risk_reward_score = min(10, max(0, round(risk_reward / 3 * 10)))
-    macro_score = 5 if macro_available and relative_strength >= -0.02 else 2 if macro_available else 0
 
     score_breakdown = {
-        "technical": int(technical_score),
-        "volume": int(volume_score),
+        "trend_score": int(trend_score),
+        "momentum_score": int(momentum_score),
+        "volume_liquidity_score": int(volume_liquidity_score),
+        "bandarmology_score": int(bandarmology_score),
+        "smart_money_score": int(smart_money_component),
+        "broker_accumulation": int(broker_accumulation_component),
+        "foreign_flow": int(foreign_flow_component),
         "relative_strength": int(relative_strength_score),
-        "bandarmology": int(bandar_score),
-        "risk_reward": int(risk_reward_score),
-        "macro": int(macro_score),
+        "macro_risk_score": int(macro_score),
+        "sentiment_score": int(sentiment_score),
+        "astro_cycle_score": int(astro_cycle_score),
     }
-    final_score = int(min(100, sum(score_breakdown.values())))
-    confidence = round(min(0.95, max(0.35, final_score / 100 * 0.75 + (0.08 if len(enriched) >= 200 else 0))), 2)
+    final_score = int(min(100, trend_score + momentum_score + volume_liquidity_score + bandarmology_score + relative_strength_score + macro_score + sentiment_score + astro_cycle_score))
+    calibrated_probability = calibrated_probability_from_score(final_score)
+    confidence = round(calibrated_probability, 2)
 
     reasons: list[str] = []
     if ma20 > ma50:
@@ -911,8 +1050,16 @@ async def build_idx_recommendation(
         reasons.append("Relative strength mengalahkan benchmark pasar.")
     if bandarmology.get("verdict") == "akumulasi":
         reasons.append("Bandarmology menunjukkan akumulasi.")
-    elif smart_money > 0:
+    if broker_accumulation_component >= 7:
+        reasons.append("Broker accumulation score mendukung akumulasi.")
+    if foreign_flow_component >= 4:
+        reasons.append("Foreign/broker flow positif terhadap nilai transaksi.")
+    if smart_money > 0:
         reasons.append("Smart money proxy masih positif.")
+    if technical_context["breakout_distance"] >= -0.03:
+        reasons.append("Harga berada dekat area breakout 30 hari.")
+    if technical_context["macd_histogram"] > 0:
+        reasons.append("MACD histogram positif.")
     if risk_reward >= 1.5:
         reasons.append(f"Risk/reward masih layak di sekitar {risk_reward}x.")
     if not reasons:
@@ -938,6 +1085,7 @@ async def build_idx_recommendation(
         "final_score": final_score,
         "signal": signal,
         "confidence": confidence,
+        "calibrated_probability": calibrated_probability,
         "last_price": _round_price(latest_close, market),
         "entry_zone": [_round_price(entry_low, market), _round_price(entry_high, market)],
         "target_1": _round_price(target_1, market),
@@ -945,6 +1093,14 @@ async def build_idx_recommendation(
         "stop_loss": _round_price(stop_loss, market),
         "risk_reward": risk_reward,
         "score_breakdown": score_breakdown,
+        "technical_indicators": technical_context,
+        "bandarmology_components": {
+            "smart_money_score": smart_money_component,
+            "broker_accumulation": broker_accumulation_component,
+            "foreign_flow": foreign_flow_component,
+            "raw_broker_accumulation_score": broker_accumulation_raw,
+            "net_buy_value": net_buy_value,
+        },
         "main_reasons": reasons[:6],
         "main_risks": risks[:5],
         "price_context": {
@@ -956,6 +1112,7 @@ async def build_idx_recommendation(
             "resistance": _round_price(resistance, market),
             "volume_ratio_5d": round(volume_ratio, 2),
             "relative_strength": round(relative_strength, 4),
+            "avg_value_20d": round(value_20, 2),
         },
         "data_quality": {
             "ohlcv_available": True,

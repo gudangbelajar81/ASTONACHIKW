@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.services.bandarmology_engine import build_bandarmology, enrich_ohlcv
 from backend.app.services.prediction_engine import (
+    build_expanded_technical_context,
     _max_drawdown,
     _round_price,
     _safe_float,
     build_idx_recommendation,
+    clamp,
     load_price_frame,
     normalize_backend_ticker,
 )
@@ -58,8 +60,10 @@ def compute_historical_score(window: pd.DataFrame, benchmark_window: pd.DataFram
     ma200 = _safe_float(latest.ma200, latest_close)
     volume_5 = _safe_float(volume.tail(5).mean())
     volume_20 = _safe_float(volume.tail(20).mean())
+    value_20 = volume_20 * _safe_float(close.tail(20).mean(), latest_close)
     volume_ratio = volume_5 / volume_20 if volume_20 > 0 else 1.0
     return_20 = latest_close / _safe_float(close.iloc[-21], latest_close) - 1 if len(close) > 21 else 0.0
+    technical_context = build_expanded_technical_context(enriched, latest_close, ma20, ma50, ma200)
 
     relative_strength = 0.0
     if benchmark_window is not None and len(benchmark_window) > 21:
@@ -72,30 +76,35 @@ def compute_historical_score(window: pd.DataFrame, benchmark_window: pd.DataFram
     except Exception:
         bandarmology = {"verdict": "netral", "smart_money_score": 0.0}
 
-    technical = 0
-    technical += 8 if ma20 > ma50 else 0
-    technical += 5 if ma50 > ma200 else 0
-    technical += 5 if latest_close > ma20 else 0
-    technical += 4 if return_20 > 0 else 0
-    technical += 3 if latest_close >= _safe_float(enriched["high"].tail(30).max()) * 0.96 else 0
-    technical = min(25, technical)
-    volume_score = min(15, max(0, round((volume_ratio - 0.8) / 0.8 * 15)))
-    rs_score = min(15, max(0, round((relative_strength + 0.04) / 0.12 * 15)))
+    trend_score = round(technical_context["score"] * 20)
+    momentum_score = round(clamp((return_20 + 0.04) / 0.12, 0, 1) * 15)
+    liquidity_unit = min(1.0, value_20 / 5_000_000_000)
+    volume_score = round((clamp((volume_ratio - 0.8) / 0.8, 0, 1) * 0.65 + liquidity_unit * 0.35) * 15)
+    rs_score = min(10, max(0, round((relative_strength + 0.04) / 0.12 * 10)))
     smart_money = _safe_float(bandarmology.get("smart_money_score"))
-    bandar = min(20, max(0, round((smart_money + 1) / 2 * 20)))
+    broker_component = 5
+    foreign_component = 3
+    smart_money_component = min(15, max(0, round((smart_money + 1) / 2 * 15)))
+    bandar = min(20, max(0, round((smart_money_component + broker_component + foreign_component) / 30 * 20)))
     if bandarmology.get("verdict") == "akumulasi":
-        bandar = min(20, bandar + 3)
+        bandar = min(20, bandar + 2)
     if bandarmology.get("verdict") == "distribusi":
-        bandar = max(0, bandar - 5)
-    risk_reward = 7
-    macro = 5 if relative_strength >= 0 else 2
+        bandar = max(0, bandar - 4)
+    macro = 10 if relative_strength >= 0 else 4
+    sentiment = 3
+    astro = 3
     breakdown = {
-        "technical": int(technical),
-        "volume": int(volume_score),
+        "trend_score": int(trend_score),
+        "momentum_score": int(momentum_score),
+        "volume_liquidity_score": int(volume_score),
+        "bandarmology_score": int(bandar),
+        "smart_money_score": int(smart_money_component),
+        "broker_accumulation": int(broker_component),
+        "foreign_flow": int(foreign_component),
         "relative_strength": int(rs_score),
-        "bandarmology": int(bandar),
-        "risk_reward": int(risk_reward),
-        "macro": int(macro),
+        "macro_risk_score": int(macro),
+        "sentiment_score": int(sentiment),
+        "astro_cycle_score": int(astro),
     }
     context = {
         "ma20": ma20,
@@ -104,9 +113,11 @@ def compute_historical_score(window: pd.DataFrame, benchmark_window: pd.DataFram
         "volume_ratio_5d": volume_ratio,
         "relative_strength": relative_strength,
         "bandarmology": bandarmology.get("verdict", "netral"),
+        "technical_indicators": technical_context,
         "breakdown": breakdown,
     }
-    return int(min(100, sum(breakdown.values()))), breakdown, context
+    final_score = trend_score + momentum_score + volume_score + bandar + rs_score + macro + sentiment + astro
+    return int(min(100, final_score)), breakdown, context
 
 
 def entry_allowed(rule: str, score: int, context: dict[str, Any], latest: pd.Series) -> bool:
@@ -357,6 +368,7 @@ async def run_idx_screener(session: AsyncSession, request) -> dict[str, Any]:
                     "symbol": symbol,
                     "final_score": report["final_score"],
                     "signal": report["signal"],
+                    "calibrated_probability": report.get("calibrated_probability"),
                     "horizon": label,
                     "last_price": report["last_price"],
                     "entry_zone": report["entry_zone"],

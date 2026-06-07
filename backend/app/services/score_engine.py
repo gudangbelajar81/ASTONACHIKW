@@ -9,21 +9,31 @@ from backend.app.services.prediction_engine import build_idx_recommendation
 
 
 SCORE_MAX = {
-    "technical": 25,
-    "volume": 15,
-    "relative_strength": 15,
-    "bandarmology": 20,
-    "risk_reward": 10,
-    "macro": 5,
+    "trend_score": 20,
+    "momentum_score": 15,
+    "volume_liquidity_score": 15,
+    "bandarmology_score": 20,
+    "smart_money_score": 15,
+    "broker_accumulation": 10,
+    "foreign_flow": 5,
+    "relative_strength": 10,
+    "macro_risk_score": 10,
+    "sentiment_score": 5,
+    "astro_cycle_score": 5,
 }
 
 SCORE_EXPLANATIONS = {
-    "technical": "Trend, posisi harga terhadap MA20/MA50/MA200, momentum, dan area resistance.",
-    "volume": "Kenaikan volume 5 hari dibanding rata-rata 20 hari.",
+    "trend_score": "Trend teknikal: MA20/MA50/MA200, breakout, RSI, MACD, ATR regime, gap, VWAP, Fibonacci, dan Ichimoku.",
+    "momentum_score": "Momentum harga sesuai horizon yang dipilih.",
+    "volume_liquidity_score": "Volume naik, value traded, dan kecukupan likuiditas.",
+    "bandarmology_score": "Skor utama bandarmology yang diskalakan dari smart money, broker accumulation, dan foreign flow.",
+    "smart_money_score": "Subkomponen bandarmology dari smart money proxy.",
+    "broker_accumulation": "Subkomponen bandarmology dari broker accumulation provider/internal.",
+    "foreign_flow": "Subkomponen bandarmology dari net buy/foreign/broker flow.",
     "relative_strength": "Kinerja saham dibanding benchmark pasar, untuk IDX memakai IHSG.",
-    "bandarmology": "Akumulasi/distribusi dari proxy internal atau provider live bila tersedia.",
-    "risk_reward": "Kelayakan jarak entry, target, dan stop loss.",
-    "macro": "Konteks benchmark/makro sederhana dari kekuatan relatif pasar.",
+    "macro_risk_score": "Konteks risiko makro/benchmark IDX.",
+    "sentiment_score": "Sentimen headline/news yang tersedia.",
+    "astro_cycle_score": "Kontribusi siklus AstroCycle, tetap kecil sampai kontribusinya tervalidasi backtest.",
 }
 
 
@@ -118,6 +128,7 @@ async def build_prediction_score(
         "final_score": recommendation["final_score"],
         "signal": recommendation["signal"],
         "confidence": recommendation["confidence"],
+        "calibrated_probability": recommendation["calibrated_probability"],
         "last_price": recommendation["last_price"],
         "entry_zone": recommendation["entry_zone"],
         "target_1": recommendation["target_1"],
@@ -125,6 +136,8 @@ async def build_prediction_score(
         "stop_loss": recommendation["stop_loss"],
         "risk_reward": recommendation["risk_reward"],
         "score_components": build_score_components(recommendation["score_breakdown"]),
+        "technical_indicators": recommendation["technical_indicators"],
+        "bandarmology_components": recommendation["bandarmology_components"],
         "main_reasons": recommendation["main_reasons"],
         "main_risks": recommendation["main_risks"],
         "invalidation": invalidation,

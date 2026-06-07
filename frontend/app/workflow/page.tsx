@@ -67,6 +67,7 @@ type RecommendationResponse = {
   final_score: number;
   signal: string;
   confidence: number;
+  calibrated_probability?: number | null;
   last_price: number;
   entry_zone: number[];
   target_1: number;
@@ -272,7 +273,7 @@ export default function WorkflowPage() {
               <h2>Rekomendasi Terstruktur</h2>
               <p>
                 {recommendation
-                  ? `${recommendation.symbol} • ${recommendation.signal} • confidence ${formatPercent(recommendation.confidence)}`
+                  ? `${recommendation.symbol} • ${recommendation.signal} • calibrated probability ${formatPercent(recommendation.calibrated_probability ?? recommendation.confidence)}`
                   : recommendationLoading
                     ? "Menghitung rekomendasi top rank..."
                     : "Belum ada rekomendasi terstruktur."}
