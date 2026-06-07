@@ -199,6 +199,21 @@ def summarize_trades(trades: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def screener_backtest_verdict(report: dict[str, Any]) -> dict[str, Any]:
+    win_rate = report.get("win_rate")
+    profit_factor = report.get("profit_factor")
+    total_trade = int(report.get("total_trade") or 0)
+    if total_trade < 8:
+        verdict = "Backtest belum cukup."
+    elif (win_rate or 0) >= 0.58 and (profit_factor or 0) >= 1.2:
+        verdict = "Backtest mendukung."
+    elif (win_rate or 0) >= 0.5:
+        verdict = "Backtest netral."
+    else:
+        verdict = "Backtest lemah."
+    return {"verdict": verdict, "win_rate": win_rate, "profit_factor": profit_factor}
+
+
 def threshold_check(scored_rows: list[dict[str, Any]], threshold: int, random_average: float) -> dict[str, Any]:
     selected = [row["forward_return"] for row in scored_rows if row["score"] > threshold]
     if not selected:
@@ -354,9 +369,37 @@ async def run_idx_screener(session: AsyncSession, request) -> dict[str, Any]:
                     "volume_ratio_5d": price_context["volume_ratio_5d"],
                     "relative_strength": price_context["relative_strength"],
                     "bandarmology": bandarmology.get("verdict", "netral"),
+                    "backtest_confidence": None,
+                    "backtest_win_rate": None,
+                    "backtest_profit_factor": None,
                     "reasons": report["main_reasons"],
                     "risks": report["main_risks"],
                 }
+                if label == horizon_label(request.horizon):
+                    try:
+                        backtest_report = await run_idx_backtest(
+                            session,
+                            type(
+                                "ScreenerBacktestRequest",
+                                (),
+                                {
+                                    "ticker": symbol,
+                                    "start_date": date.today() - timedelta(days=540),
+                                    "end_date": date.today(),
+                                    "horizon": f"{horizon_to_days(label)}d",
+                                    "rule_entry": "score_gt_70",
+                                    "rule_exit": "target_stop_or_horizon",
+                                    "stop_loss": 0.03,
+                                    "target_profit": 0.06,
+                                },
+                            )(),
+                        )
+                        confidence = screener_backtest_verdict(backtest_report)
+                        item["backtest_confidence"] = confidence["verdict"]
+                        item["backtest_win_rate"] = confidence["win_rate"]
+                        item["backtest_profit_factor"] = confidence["profit_factor"]
+                    except Exception:
+                        item["backtest_confidence"] = "Backtest belum tersedia."
                 if pass_filters and report["final_score"] >= 58:
                     buckets[label].append(item)
                 elif label == horizon_label(request.horizon) and (report["final_score"] < 45 or bandarmology.get("verdict") == "distribusi"):

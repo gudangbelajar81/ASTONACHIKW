@@ -5,6 +5,7 @@ from backend.app.db.session import get_session
 from backend.app.schemas.backtest import BacktestRequest, BacktestResponse, ScreenerRequest, ScreenerResponse
 from backend.app.schemas.prediction import ModelWeightResponse, PerformanceResponse, PredictionResponse, WatchlistResponse
 from backend.app.schemas.recommendation import RecommendationRequest, RecommendationResponse
+from backend.app.schemas.score import PredictionScoreRequest, PredictionScoreResponse
 from backend.app.schemas.workflow import WorkflowResponse
 from backend.app.services.idx_backtest import run_idx_backtest, run_idx_screener
 from backend.app.services.prediction_engine import (
@@ -15,6 +16,7 @@ from backend.app.services.prediction_engine import (
     build_watchlist,
     train_weight_profile,
 )
+from backend.app.services.score_engine import build_prediction_score
 
 router = APIRouter(tags=["predictions"])
 
@@ -34,6 +36,43 @@ async def read_prediction(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gagal membuat prediksi: {exc}")
+
+
+@router.get("/prediction/score", response_model=PredictionScoreResponse)
+async def read_prediction_score(
+    ticker: str = Query(default="BBCA"),
+    horizon: str = Query(default="weekly"),
+    market: str = Query(default="id"),
+    session: AsyncSession = Depends(get_session),
+) -> PredictionScoreResponse:
+    try:
+        report = await build_prediction_score(session, ticker, horizon=horizon, market=market)
+        return PredictionScoreResponse(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal membuat score prediksi: {exc}")
+
+
+@router.post("/prediction/score", response_model=PredictionScoreResponse)
+async def read_prediction_score_post(
+    request: PredictionScoreRequest,
+    session: AsyncSession = Depends(get_session),
+) -> PredictionScoreResponse:
+    try:
+        report = await build_prediction_score(
+            session,
+            request.ticker,
+            horizon=request.horizon,
+            market=request.market,
+            backtest_start=request.backtest_start,
+            backtest_end=request.backtest_end,
+        )
+        return PredictionScoreResponse(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal membuat score prediksi: {exc}")
 
 
 @router.get("/performance/{ticker}", response_model=PerformanceResponse)

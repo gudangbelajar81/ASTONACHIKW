@@ -76,6 +76,9 @@ class ScreenerItem(BaseModel):
     volume_ratio_5d: float
     relative_strength: float
     bandarmology: str
+    backtest_confidence: str | None = None
+    backtest_win_rate: float | None = None
+    backtest_profit_factor: float | None = None
     reasons: list[str]
     risks: list[str]
 
