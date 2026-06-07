@@ -2,10 +2,13 @@ from datetime import date, timedelta
 from typing import Any
 
 import pandas as pd
-import yfinance as yf
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.services.market import configure_yfinance_cache, fetch_market_data
+
+configure_yfinance_cache()
+
+import yfinance as yf
 
 POSITIVE_TERMS = {
     "beat",

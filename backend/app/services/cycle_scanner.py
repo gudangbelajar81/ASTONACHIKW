@@ -6,9 +6,13 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import yfinance as yf
 from backend.app.db.models import AstroMeasurement
 from backend.app.services.ephemeris_service import DEFAULT_PLANETS
+from backend.app.services.market import configure_yfinance_cache
+
+configure_yfinance_cache()
+
+import yfinance as yf
 
 
 class ScanResult:
@@ -123,6 +127,7 @@ def fetch_market_data(
     end_date: date,
 ) -> list[dict[str, Any]] | None:
     try:
+        configure_yfinance_cache()
         data = yf.download(ticker, start=start_date.isoformat(), end=end_date.isoformat(), progress=False)
         if data.empty:
             return None

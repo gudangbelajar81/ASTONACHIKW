@@ -1,6 +1,19 @@
 from datetime import date
 import os
 import pandas as pd
+
+
+def _prepare_cache_environment() -> str:
+    cache_dir = os.getenv("YFINANCE_CACHE_DIR", "/tmp/yfinance-cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    os.environ.setdefault("YFINANCE_CACHE_DIR", cache_dir)
+    os.environ.setdefault("XDG_CACHE_HOME", "/tmp")
+    os.environ.setdefault("HOME", "/tmp")
+    return cache_dir
+
+
+_prepare_cache_environment()
+
 import yfinance as yf
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,8 +21,7 @@ from backend.app.db.models import MarketPrice
 
 
 def configure_yfinance_cache() -> None:
-    cache_dir = os.getenv("YFINANCE_CACHE_DIR", "/tmp/yfinance-cache")
-    os.makedirs(cache_dir, exist_ok=True)
+    cache_dir = _prepare_cache_environment()
     if hasattr(yf, "set_tz_cache_location"):
         yf.set_tz_cache_location(cache_dir)
 
