@@ -3,7 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.db.session import get_session
 from backend.app.schemas.prediction import ModelWeightResponse, PerformanceResponse, PredictionResponse, WatchlistResponse
-from backend.app.services.prediction_engine import build_performance_report, build_prediction, build_watchlist, train_weight_profile
+from backend.app.schemas.workflow import WorkflowResponse
+from backend.app.services.prediction_engine import (
+    build_idx_workflow,
+    build_performance_report,
+    build_prediction,
+    build_watchlist,
+    train_weight_profile,
+)
 
 router = APIRouter(tags=["predictions"])
 
@@ -66,3 +73,16 @@ async def read_watchlist(
         return WatchlistResponse(**report)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gagal membaca watchlist: {exc}")
+
+
+@router.get("/workflow/idx", response_model=WorkflowResponse)
+async def read_idx_workflow(
+    tickers: str = Query(default="BBCA,BBRI,BMRI,TLKM,ASII,BBNI,UNVR,CPIN,ICBP,AMRT"),
+    market: str = Query(default="id"),
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowResponse:
+    try:
+        report = await build_idx_workflow(session, tickers.split(","), market=market)
+        return WorkflowResponse(**report)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal membaca workflow IDX: {exc}")

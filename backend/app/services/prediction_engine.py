@@ -44,6 +44,15 @@ def clamp(value: float, lower: float = -1.0, upper: float = 1.0) -> float:
     return max(lower, min(upper, value))
 
 
+def normalize_backend_ticker(value: str, market: str = "us") -> str:
+    symbol = value.strip().upper()
+    if not symbol:
+        return ""
+    if market == "id" and "." not in symbol:
+        return f"{symbol}.JK"
+    return symbol
+
+
 def sigmoid(value: float) -> float:
     return 1 / (1 + math.exp(-value))
 
@@ -603,6 +612,137 @@ async def build_watchlist(session: AsyncSession, tickers: list[str], horizon_day
         reverse=True,
     )
     return {"horizon_days": horizon_days, "items": items}
+
+
+async def build_idx_workflow(
+    session: AsyncSession,
+    tickers: list[str],
+    market: str = "id",
+    daily_horizon: int = 5,
+    weekly_horizon: int = 20,
+    monthly_horizon: int = 60,
+) -> dict:
+    universe = [normalize_backend_ticker(ticker, market) for ticker in tickers if ticker.strip()]
+    items = []
+
+    for symbol in universe:
+        try:
+            daily = await build_prediction(session, symbol, daily_horizon)
+            weekly = await build_prediction(session, symbol, weekly_horizon)
+            monthly = await build_prediction(session, symbol, monthly_horizon)
+        except Exception:
+            continue
+
+        predictions = [daily, weekly, monthly]
+        bullish_count = sum(1 for prediction in predictions if prediction["signal"] == "bullish")
+        bearish_count = sum(1 for prediction in predictions if prediction["signal"] == "bearish")
+        avg_probability = sum(float(prediction["probability_up"]) for prediction in predictions) / 3
+        avg_expected_return = sum(float(prediction["expected_return"]) for prediction in predictions) / 3
+        avg_confidence_bonus = {"tinggi": 0.08, "sedang": 0.04, "rendah": 0.0}
+        confidence_score = sum(avg_confidence_bonus.get(prediction["confidence"], 0.0) for prediction in predictions) / 3
+
+        latest = monthly
+        latest_scenario = latest.get("scenario") or {}
+        entry_low = min(
+            float(daily["scenario"]["entry_zone_low"]),
+            float(weekly["scenario"]["entry_zone_low"]),
+            float(monthly["scenario"]["entry_zone_low"]),
+        )
+        entry_high = min(
+            float(daily["scenario"]["entry_zone_high"]),
+            float(weekly["scenario"]["entry_zone_high"]),
+            float(monthly["scenario"]["entry_zone_high"]),
+        )
+        target_price = max(
+            float(daily["scenario"]["bullish_target"]),
+            float(weekly["scenario"]["bullish_target"]),
+            float(monthly["scenario"]["bullish_target"]),
+        )
+        stop_loss = min(
+            float(daily["scenario"]["invalidation_level"]),
+            float(weekly["scenario"]["invalidation_level"]),
+            float(monthly["scenario"]["invalidation_level"]),
+        )
+
+        if monthly["signal"] == "bearish" or weekly["signal"] == "bearish":
+            recommended_action = "tunggu"
+        elif monthly["signal"] == "bullish" and weekly["signal"] == "bullish" and daily["signal"] == "bullish":
+            recommended_action = "buy on pullback"
+        elif monthly["signal"] == "bullish" and weekly["signal"] in {"bullish", "netral"}:
+            recommended_action = "akumulasi bertahap"
+        else:
+            recommended_action = "pantau"
+
+        reasons = [
+            f"Daily {daily['signal']} ({daily['confidence']}, {daily['probability_up']:.0%} naik).",
+            f"Weekly {weekly['signal']} ({weekly['confidence']}, {weekly['expected_return']:.1%} expected return).",
+            f"Monthly {monthly['signal']} ({monthly['confidence']}, regime {monthly['regime']['label']}).",
+        ]
+
+        if latest.get("sentiment"):
+            reasons.append(f"Sentimen {latest['sentiment']['label']} dengan {latest['sentiment']['headline_count']} headline.")
+        if latest.get("macro"):
+            reasons.append(f"Macro risk budget: {latest['macro']['risk_budget']}.")
+        reasons.append(latest_scenario.get("playbook") or "Gunakan entry dekat zona dan disiplin stop loss.")
+
+        if bullish_count >= 2:
+            rank_score = avg_probability + avg_expected_return + confidence_score + 0.05
+        elif bearish_count >= 2:
+            rank_score = avg_probability + avg_expected_return - 0.12
+        else:
+            rank_score = avg_probability + avg_expected_return + confidence_score
+
+        items.append(
+            {
+                "ticker": symbol,
+                "rank_score": round(rank_score, 4),
+                "recommended_action": recommended_action,
+                "entry_zone_low": round(entry_low, 2),
+                "entry_zone_high": round(entry_high, 2),
+                "target_price": round(target_price, 2),
+                "stop_loss": round(stop_loss, 2),
+                "reasons": reasons,
+                "daily": {
+                    "label": "harian",
+                    "horizon_days": daily_horizon,
+                    "signal": daily["signal"],
+                    "probability_up": daily["probability_up"],
+                    "confidence": daily["confidence"],
+                    "expected_return": daily["expected_return"],
+                    "risk_label": daily["risk_label"],
+                    "summary": daily["scenario"]["playbook"],
+                },
+                "weekly": {
+                    "label": "mingguan",
+                    "horizon_days": weekly_horizon,
+                    "signal": weekly["signal"],
+                    "probability_up": weekly["probability_up"],
+                    "confidence": weekly["confidence"],
+                    "expected_return": weekly["expected_return"],
+                    "risk_label": weekly["risk_label"],
+                    "summary": weekly["scenario"]["playbook"],
+                },
+                "monthly": {
+                    "label": "bulanan",
+                    "horizon_days": monthly_horizon,
+                    "signal": monthly["signal"],
+                    "probability_up": monthly["probability_up"],
+                    "confidence": monthly["confidence"],
+                    "expected_return": monthly["expected_return"],
+                    "risk_label": monthly["risk_label"],
+                    "summary": monthly["scenario"]["playbook"],
+                },
+                "latest_prediction": latest,
+            }
+        )
+
+    items.sort(key=lambda item: (item["rank_score"], item["latest_prediction"]["probability_up"]), reverse=True)
+    return {
+        "market": market,
+        "universe_size": len(universe),
+        "scanned_size": len(items),
+        "items": items,
+    }
 
 
 async def get_market_rows(session: AsyncSession, symbol: str) -> list[MarketPrice]:

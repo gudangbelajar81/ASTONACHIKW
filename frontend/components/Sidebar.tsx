@@ -10,6 +10,7 @@ export default function Sidebar() {
     { href: "/dashboard", label: "Dasbor" },
     { href: "/performance", label: "Performance" },
     { href: "/watchlist", label: "Watchlist" },
+    { href: "/workflow", label: "IDX Workflow" },
     { href: "/lists", label: "Saved Watchlists" },
     { href: "/ohlcv", label: "OHLCV Pro" },
     { href: "/studio/image", label: "Studio Gambar" },
