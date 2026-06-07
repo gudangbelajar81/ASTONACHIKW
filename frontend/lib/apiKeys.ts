@@ -39,6 +39,7 @@ export type MediaProviderConfig = {
   notes: string;
   enabled: boolean;
   lastChecked?: string;
+  lastCheckDetail?: string;
 };
 
 export const API_KEYS_STORAGE_KEY = "astrocycle_api_provider_settings";

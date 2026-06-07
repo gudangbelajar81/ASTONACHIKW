@@ -158,17 +158,28 @@ export default function SettingsPage() {
       saveMediaProviders(
         mediaProviders.map((item) =>
           item.id === provider.id
-            ? { ...item, status: result.status === "live" ? "live" : "dead", lastChecked: new Date().toISOString() }
+            ? {
+                ...item,
+                status: result.status === "live" ? "live" : "dead",
+                lastChecked: new Date().toISOString(),
+                lastCheckDetail: result.detail ?? "",
+              }
             : item
         )
+      );
+      setStatusMessage(
+        `${provider.name}: ${result.status === "live" ? "LIVE" : "DEAD"}${result.detail ? ` - ${result.detail}` : ""}`
       );
       appendUsageEvent({ action: "media_key_check", ticker: provider.id, source: "settings" });
     } catch {
       saveMediaProviders(
         mediaProviders.map((item) =>
-          item.id === provider.id ? { ...item, status: "dead", lastChecked: new Date().toISOString() } : item
+          item.id === provider.id
+            ? { ...item, status: "dead", lastChecked: new Date().toISOString(), lastCheckDetail: "Gagal cek key." }
+            : item
         )
       );
+      setStatusMessage(`${provider.name}: DEAD - Gagal cek key.`);
     } finally {
       setCheckingKeyId(null);
     }
@@ -546,6 +557,9 @@ export default function SettingsPage() {
               </div>
 
               <div className="api-empty">{activeMediaProvider.notes}</div>
+              {activeMediaProvider.lastCheckDetail ? (
+                <div className="api-empty">Hasil cek terakhir: {activeMediaProvider.lastCheckDetail}</div>
+              ) : null}
 
               <div className="api-key-list">
                 <div className="media-preview-card">
