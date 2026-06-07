@@ -7,12 +7,16 @@ import {
   ApiProviderConfig,
   DEFAULT_API_PROVIDERS,
   DEFAULT_MARKET_PROVIDERS,
+  DEFAULT_MEDIA_PROVIDERS,
   MarketProviderConfig,
+  MediaProviderConfig,
   maskKey,
   readApiProviders,
   readMarketProviders,
+  readMediaProviders,
   writeApiProviders,
   writeMarketProviders,
+  writeMediaProviders,
 } from "../../lib/apiKeys";
 import {
   appendUsageEvent,
@@ -48,10 +52,12 @@ const PLAN_OPTIONS: Record<PlanProfile["tier"], Pick<PlanProfile, "dailyApiLimit
 };
 
 export default function SettingsPage() {
-  const [section, setSection] = useState<"ai" | "market" | "mode" | "usage" | "backup">("ai");
+  const [section, setSection] = useState<"ai" | "media" | "market" | "mode" | "usage" | "backup">("ai");
   const [providers, setProviders] = useState<ApiProviderConfig[]>(DEFAULT_API_PROVIDERS);
   const [marketProviders, setMarketProviders] = useState<MarketProviderConfig[]>(DEFAULT_MARKET_PROVIDERS);
+  const [mediaProviders, setMediaProviders] = useState<MediaProviderConfig[]>(DEFAULT_MEDIA_PROVIDERS);
   const [activeProviderId, setActiveProviderId] = useState(DEFAULT_API_PROVIDERS[0].id);
+  const [activeMediaProviderId, setActiveMediaProviderId] = useState(DEFAULT_MEDIA_PROVIDERS[0].id);
   const [rawKeys, setRawKeys] = useState("");
   const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
@@ -66,6 +72,7 @@ export default function SettingsPage() {
   useEffect(() => {
     setProviders(readApiProviders());
     setMarketProviders(readMarketProviders());
+    setMediaProviders(readMediaProviders());
     setMarketMode(readMarketMode());
     setPlanProfile(readPlanProfile());
     setUsageLog(readUsageLog());
@@ -79,6 +86,11 @@ export default function SettingsPage() {
   function saveMarketProviders(nextProviders: MarketProviderConfig[]) {
     setMarketProviders(nextProviders);
     writeMarketProviders(nextProviders);
+  }
+
+  function saveMediaProviders(nextProviders: MediaProviderConfig[]) {
+    setMediaProviders(nextProviders);
+    writeMediaProviders(nextProviders);
   }
 
   function savePlan(nextPlan: PlanProfile) {
@@ -117,6 +129,49 @@ export default function SettingsPage() {
 
   function updateActiveProvider(updater: (provider: ApiProviderConfig) => ApiProviderConfig) {
     saveProviders(providers.map((provider) => (provider.id === activeProvider.id ? updater(provider) : provider)));
+  }
+
+  const activeMediaProvider = useMemo(
+    () => mediaProviders.find((provider) => provider.id === activeMediaProviderId) ?? mediaProviders[0],
+    [mediaProviders, activeMediaProviderId]
+  );
+
+  function updateActiveMediaProvider(updater: (provider: MediaProviderConfig) => MediaProviderConfig) {
+    if (!activeMediaProvider) return;
+    saveMediaProviders(
+      mediaProviders.map((provider) => (provider.id === activeMediaProvider.id ? updater(provider) : provider))
+    );
+  }
+
+  async function checkMediaProvider(provider: MediaProviderConfig) {
+    setCheckingKeyId(provider.id);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/kie/media/test-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: provider.id,
+          api_key: provider.apiKey,
+        }),
+      });
+      const result = await response.json();
+      saveMediaProviders(
+        mediaProviders.map((item) =>
+          item.id === provider.id
+            ? { ...item, status: result.status === "live" ? "live" : "dead", lastChecked: new Date().toISOString() }
+            : item
+        )
+      );
+      appendUsageEvent({ action: "media_key_check", ticker: provider.id, source: "settings" });
+    } catch {
+      saveMediaProviders(
+        mediaProviders.map((item) =>
+          item.id === provider.id ? { ...item, status: "dead", lastChecked: new Date().toISOString() } : item
+        )
+      );
+    } finally {
+      setCheckingKeyId(null);
+    }
   }
 
   function handleAddKeys(event: FormEvent<HTMLFormElement>) {
@@ -196,16 +251,44 @@ export default function SettingsPage() {
   }
 
   function exportBackup() {
-    setBackupJson(JSON.stringify(exportUserData(), null, 2));
+    setBackupJson(
+      JSON.stringify(
+        {
+          user: exportUserData(),
+          apiProviders: readApiProviders(),
+          marketProviders: readMarketProviders(),
+          mediaProviders: readMediaProviders(),
+        },
+        null,
+        2
+      )
+    );
     setStatusMessage("Backup data lokal siap disalin.");
   }
 
   function importBackup() {
     try {
-      const payload = JSON.parse(backupJson) as Parameters<typeof importUserData>[0];
-      importUserData(payload);
+      const payload = JSON.parse(backupJson) as {
+        user?: ReturnType<typeof exportUserData>;
+        apiProviders?: ApiProviderConfig[];
+        marketProviders?: MarketProviderConfig[];
+        mediaProviders?: MediaProviderConfig[];
+      };
+      if (payload.user) {
+        importUserData(payload.user);
+      }
+      if (payload.apiProviders) {
+        writeApiProviders(payload.apiProviders);
+      }
+      if (payload.marketProviders) {
+        writeMarketProviders(payload.marketProviders);
+      }
+      if (payload.mediaProviders) {
+        writeMediaProviders(payload.mediaProviders);
+      }
       setProviders(readApiProviders());
       setMarketProviders(readMarketProviders());
+      setMediaProviders(readMediaProviders());
       setMarketMode(readMarketMode());
       setPlanProfile(readPlanProfile());
       setUsageLog(readUsageLog());
@@ -240,6 +323,7 @@ export default function SettingsPage() {
       if (ok) {
         setProviders(readApiProviders());
         setMarketProviders(readMarketProviders());
+        setMediaProviders(readMediaProviders());
         setMarketMode(readMarketMode());
         setPlanProfile(readPlanProfile());
         setUsageLog(readUsageLog());
@@ -269,6 +353,9 @@ export default function SettingsPage() {
         <div className="settings-section-tabs">
           <button className={section === "ai" ? "active" : ""} type="button" onClick={() => setSection("ai")}>
             Pusat AI
+          </button>
+          <button className={section === "media" ? "active" : ""} type="button" onClick={() => setSection("media")}>
+            Pusat Media
           </button>
           <button className={section === "market" ? "active" : ""} type="button" onClick={() => setSection("market")}>
             Pusat Data IDX
@@ -380,6 +467,102 @@ export default function SettingsPage() {
                   </button>
                 </form>
               ) : null}
+            </section>
+          </div>
+        ) : null}
+
+        {section === "media" ? (
+          <div className="settings-layout">
+            <aside className="settings-tabs">
+              {mediaProviders.map((provider) => (
+                <button
+                  key={provider.id}
+                  className={provider.id === activeMediaProvider.id ? "active" : ""}
+                  type="button"
+                  onClick={() => setActiveMediaProviderId(provider.id)}
+                >
+                  <span>{provider.name}</span>
+                  <strong>{provider.enabled ? "aktif" : "nonaktif"}</strong>
+                </button>
+              ))}
+            </aside>
+
+            <section className="api-center">
+              <div className="api-center__topline">
+                <div>
+                  <h2>{activeMediaProvider.name}</h2>
+                  <p>Key ini dipakai untuk generate gambar dan video langsung dari studio aplikasi.</p>
+                </div>
+                <span className={`api-status api-status--${activeMediaProvider.status}`}>
+                  {activeMediaProvider.status === "live"
+                    ? "LIVE"
+                    : activeMediaProvider.status === "dead"
+                      ? "DEAD"
+                      : "BELUM CEK"}
+                </span>
+              </div>
+
+              <div className="media-provider-grid">
+                <label>
+                  Model
+                  <input
+                    value={activeMediaProvider.model}
+                    onChange={(event) =>
+                      updateActiveMediaProvider((provider) => ({ ...provider, model: event.target.value }))
+                    }
+                    placeholder={activeMediaProvider.id === "kie_image" ? "gpt4o-image" : "runway-duration-5-generate"}
+                  />
+                </label>
+
+                <label>
+                  API Key
+                  <input
+                    value={activeMediaProvider.apiKey}
+                    onChange={(event) =>
+                      updateActiveMediaProvider((provider) => ({
+                        ...provider,
+                        apiKey: event.target.value,
+                        status: "unknown",
+                      }))
+                    }
+                    placeholder="Tempel API key Kie.ai di sini"
+                  />
+                </label>
+
+                <label className="provider-toggle">
+                  <input
+                    type="checkbox"
+                    checked={activeMediaProvider.enabled}
+                    onChange={(event) =>
+                      updateActiveMediaProvider((provider) => ({ ...provider, enabled: event.target.checked }))
+                    }
+                  />
+                  Aktifkan provider
+                </label>
+
+                <button type="button" onClick={() => checkMediaProvider(activeMediaProvider)}>
+                  {checkingKeyId === activeMediaProvider.id ? "Cek..." : "Cek Status"}
+                </button>
+              </div>
+
+              <div className="api-empty">{activeMediaProvider.notes}</div>
+
+              <div className="api-key-list">
+                <div className="media-preview-card">
+                  <h3>Studio Pakai Provider Ini</h3>
+                  <p>
+                    {activeMediaProvider.id === "kie_image"
+                      ? "Buka Studio Gambar untuk text-to-image dan image editing."
+                      : "Buka Studio Video untuk text-to-video dan image-to-video."}
+                  </p>
+                  <div className="media-preview-actions">
+                    <a href={activeMediaProvider.id === "kie_image" ? "/studio/image" : "/studio/video"}>
+                      Buka Studio
+                    </a>
+                    <span>{activeMediaProvider.enabled ? "Siap dipakai" : "Aktifkan dulu agar enak dipakai"}</span>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         ) : null}

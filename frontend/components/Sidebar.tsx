@@ -12,6 +12,8 @@ export default function Sidebar() {
     { href: "/watchlist", label: "Watchlist" },
     { href: "/lists", label: "Saved Watchlists" },
     { href: "/ohlcv", label: "OHLCV Pro" },
+    { href: "/studio/image", label: "Studio Gambar" },
+    { href: "/studio/video", label: "Studio Video" },
     { href: "/alerts", label: "Alerts" },
     { href: "/portfolio", label: "Portfolio" },
     { href: "/report", label: "Report" },

@@ -28,8 +28,22 @@ export type MarketProviderConfig = {
   lastChecked?: string;
 };
 
+export type MediaProviderId = "kie_image" | "kie_video";
+
+export type MediaProviderConfig = {
+  id: MediaProviderId;
+  name: string;
+  apiKey: string;
+  model: string;
+  status: "unknown" | "live" | "dead";
+  notes: string;
+  enabled: boolean;
+  lastChecked?: string;
+};
+
 export const API_KEYS_STORAGE_KEY = "astrocycle_api_provider_settings";
 export const MARKET_PROVIDER_STORAGE_KEY = "astrocycle_market_provider_settings";
+export const MEDIA_PROVIDER_STORAGE_KEY = "astrocycle_media_provider_settings";
 
 export const DEFAULT_API_PROVIDERS: ApiProviderConfig[] = [
   { id: "kie", name: "Kie.ai / Claude", model: "claude-opus-4-6", keys: [] },
@@ -74,6 +88,27 @@ export const DEFAULT_MARKET_PROVIDERS: MarketProviderConfig[] = [
     apiKey: "",
     status: "unknown",
     notes: "Untuk provider data lain yang formatnya nanti bisa dipetakan.",
+    enabled: false,
+  },
+];
+
+export const DEFAULT_MEDIA_PROVIDERS: MediaProviderConfig[] = [
+  {
+    id: "kie_image",
+    name: "Kie Image Studio",
+    apiKey: "",
+    model: "gpt4o-image",
+    status: "unknown",
+    notes: "Text-to-image dan image editing lewat Kie.ai.",
+    enabled: false,
+  },
+  {
+    id: "kie_video",
+    name: "Kie Video Studio",
+    apiKey: "",
+    model: "runway-duration-5-generate",
+    status: "unknown",
+    notes: "Text-to-video dan image-to-video lewat Kie.ai.",
     enabled: false,
   },
 ];
@@ -133,6 +168,24 @@ export function writeMarketProviders(providers: MarketProviderConfig[]) {
   localStorage.setItem(MARKET_PROVIDER_STORAGE_KEY, JSON.stringify(providers));
 }
 
+export function readMediaProviders(): MediaProviderConfig[] {
+  if (typeof window === "undefined") return DEFAULT_MEDIA_PROVIDERS;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(MEDIA_PROVIDER_STORAGE_KEY) ?? "[]") as MediaProviderConfig[];
+    return DEFAULT_MEDIA_PROVIDERS.map((provider) => {
+      const existing = saved.find((item) => item.id === provider.id);
+      return existing ? { ...provider, ...existing } : provider;
+    });
+  } catch {
+    return DEFAULT_MEDIA_PROVIDERS;
+  }
+}
+
+export function writeMediaProviders(providers: MediaProviderConfig[]) {
+  localStorage.setItem(MEDIA_PROVIDER_STORAGE_KEY, JSON.stringify(providers));
+}
+
 export function buildMarketProviderConfig(providers: MarketProviderConfig[]) {
   return {
     market_data_providers: providers
@@ -140,6 +193,18 @@ export function buildMarketProviderConfig(providers: MarketProviderConfig[]) {
       .map((provider) => ({
         id: provider.id,
         endpoint: provider.endpoint,
+        api_key: provider.apiKey,
+      })),
+  };
+}
+
+export function buildMediaProviderConfig(providers: MediaProviderConfig[]) {
+  return {
+    media_providers: providers
+      .filter((provider) => provider.enabled && provider.apiKey && provider.model)
+      .map((provider) => ({
+        id: provider.id,
+        model: provider.model,
         api_key: provider.apiKey,
       })),
   };

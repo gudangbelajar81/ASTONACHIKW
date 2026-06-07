@@ -1,4 +1,11 @@
-import { readApiProviders, readMarketProviders, writeApiProviders, writeMarketProviders } from "./apiKeys";
+import {
+  readApiProviders,
+  readMarketProviders,
+  readMediaProviders,
+  writeApiProviders,
+  writeMarketProviders,
+  writeMediaProviders,
+} from "./apiKeys";
 import { exportUserData, importUserData } from "./userData";
 
 function getApiUrl() {
@@ -31,6 +38,7 @@ export async function loadCloudState() {
       user: ReturnType<typeof exportUserData>;
       apiProviders: ReturnType<typeof readApiProviders>;
       marketProviders: ReturnType<typeof readMarketProviders>;
+      mediaProviders: ReturnType<typeof readMediaProviders>;
     };
   } | null>;
 }
@@ -50,6 +58,7 @@ export async function saveCloudState() {
         user: exportUserData(),
         apiProviders: readApiProviders(),
         marketProviders: readMarketProviders(),
+        mediaProviders: readMediaProviders(),
       },
     }),
   });
@@ -63,5 +72,6 @@ export async function syncFromCloud() {
   importUserData(cloud.payload.user);
   writeApiProviders(cloud.payload.apiProviders);
   writeMarketProviders(cloud.payload.marketProviders);
+  writeMediaProviders(cloud.payload.mediaProviders);
   return true;
 }
