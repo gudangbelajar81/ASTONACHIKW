@@ -238,6 +238,7 @@ def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
             "X-Api-Key": api_key,
             "anthropic-version": "2023-06-01",
         },
@@ -425,14 +426,24 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
 
 def test_provider_key(provider: str, api_key: str, model: Optional[str] = None) -> None:
     normalized_provider = provider.strip().lower()
-    selected_model = model or get_provider_model(normalized_provider)
-    prompt = (
-        "Jawab hanya dengan kata OK. Ini adalah tes koneksi API untuk AstroCycle."
-    )
 
     if normalized_provider == "kie":
-        call_kie_claude(api_key=api_key, model=selected_model, prompt=prompt)
+        response = urllib.request.urlopen(
+            urllib.request.Request(
+                "https://api.kie.ai/api/v1/chat/credit",
+                headers={"Authorization": f"Bearer {api_key}"},
+                method="GET",
+            ),
+            timeout=45,
+        )
+        body = json.loads(response.read().decode("utf-8"))
+        if response.status != 200 or body.get("code") != 200:
+            raise ValueError(body.get("msg") or "KIE_API_KEY tidak valid")
         return
+
+    selected_model = model or get_provider_model(normalized_provider)
+    prompt = "Jawab hanya dengan kata OK. Ini adalah tes koneksi API untuk AstroCycle."
+
     if normalized_provider == "openai":
         call_openai_compatible(api_key=api_key, model=selected_model, prompt=prompt)
         return
