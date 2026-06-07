@@ -41,6 +41,7 @@ class BandarmologyResponse(BaseModel):
     resistance: float
     verdict: str
     notes: list[str]
+    normalized_provider_data: dict | None = None
 
 
 class OHLCVResponse(BaseModel):

@@ -21,6 +21,7 @@ import yfinance as yf
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.db.models import MarketPrice
+from backend.app.services.provider_normalizer import normalize_ohlcv_record
 
 
 def configure_yfinance_cache() -> None:
@@ -57,6 +58,13 @@ def fetch_market_data(symbol: str, start: date, end: date) -> pd.DataFrame:
     return df[["date", "open", "high", "low", "close", "volume"]]
 
 
+def normalize_ohlcv_frame(df: pd.DataFrame, symbol: str, source: str) -> pd.DataFrame:
+    records = [normalize_ohlcv_record(row, symbol, source) for row in df.to_dict("records")]
+    normalized = pd.DataFrame(records)
+    normalized["date"] = pd.to_datetime(normalized["date"]).dt.date
+    return normalized
+
+
 def _fetch_yfinance_data(symbol: str, start: date, end: date) -> pd.DataFrame:
     data = yf.download(
         symbol,
@@ -82,7 +90,8 @@ def _fetch_yfinance_data(symbol: str, start: date, end: date) -> pd.DataFrame:
         }
     )
     data["date"] = pd.to_datetime(data["date"], utc=True).dt.date
-    return data.dropna(subset=["close"])
+    data = data.dropna(subset=["close"])
+    return normalize_ohlcv_frame(data, symbol, "yfinance")
 
 
 def _fetch_yahoo_chart_data(symbol: str, start: date, end: date) -> pd.DataFrame:
@@ -126,4 +135,4 @@ def _fetch_yahoo_chart_data(symbol: str, start: date, end: date) -> pd.DataFrame
 
     if not rows:
         raise ValueError(f"No market data for {symbol}")
-    return pd.DataFrame(rows)
+    return normalize_ohlcv_frame(pd.DataFrame(rows), symbol, "yahoo_chart")

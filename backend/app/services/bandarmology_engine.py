@@ -9,6 +9,7 @@ import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.schemas.bandarmology import MarketDataProviderInput
+from backend.app.services.provider_normalizer import normalize_bandarmology_record
 from backend.app.services.prediction_engine import clamp, load_price_frame
 
 
@@ -244,6 +245,7 @@ def _extract_first_string(payload: dict, keys: list[str]) -> str | None:
 def normalize_provider_bandarmology(payload: object, ticker: str, provider_name: str) -> dict:
     source = "live"
     provider_status = "live"
+    normalized_broker = normalize_bandarmology_record(payload, ticker, provider_name)
     candidate = payload
     if isinstance(payload, dict):
         for key in ("data", "result", "payload", "output", "bandarmology", "analysis"):
@@ -253,7 +255,9 @@ def normalize_provider_bandarmology(payload: object, ticker: str, provider_name:
                 break
 
     if isinstance(candidate, dict):
-        smart_money_score = _extract_first_number(candidate, ["smart_money_score", "smartMoneyScore", "smartMoney", "score"]) or 0.0
+        broker_score = normalized_broker["broker_accumulation_score"]
+        normalized_smart_money = clamp((broker_score - 50) / 50) if broker_score else 0.0
+        smart_money_score = _extract_first_number(candidate, ["smart_money_score", "smartMoneyScore", "smartMoney", "score"]) or normalized_smart_money
         accumulation_score = _extract_first_number(candidate, ["accumulation_score", "accumulationScore", "buy_score"]) or smart_money_score
         distribution_score = _extract_first_number(candidate, ["distribution_score", "distributionScore", "sell_score"]) or (-accumulation_score)
         volume_spike = _extract_first_number(candidate, ["volume_spike", "volumeSpike", "volume_ratio", "volumeRatio"]) or 0.0
@@ -268,6 +272,12 @@ def normalize_provider_bandarmology(payload: object, ticker: str, provider_name:
             for key in ("net_buy", "net_sell", "foreign_net_buy", "foreign_net_sell", "broker", "broker_summary"):
                 if key in candidate:
                     notes.extend(_stringify_notes(candidate[key]))
+        if normalized_broker["net_buy_value"]:
+            notes.append(f"Net buy value provider: {normalized_broker['net_buy_value']:.0f}.")
+        if normalized_broker["top_buyer_brokers"]:
+            notes.append(f"Top buyer broker: {', '.join(normalized_broker['top_buyer_brokers'][:5])}.")
+        if normalized_broker["top_seller_brokers"]:
+            notes.append(f"Top seller broker: {', '.join(normalized_broker['top_seller_brokers'][:5])}.")
 
         if not verdict:
             if smart_money_score >= 0.35:
@@ -296,6 +306,7 @@ def normalize_provider_bandarmology(payload: object, ticker: str, provider_name:
             "resistance": float(resistance),
             "verdict": verdict,
             "notes": notes,
+            "normalized_provider_data": normalized_broker,
             "raw": candidate,
         }
 
@@ -315,6 +326,7 @@ def normalize_provider_bandarmology(payload: object, ticker: str, provider_name:
         "resistance": 0.0,
         "verdict": "netral",
         "notes": ["Provider live merespons format yang belum terstruktur. Simpan raw response untuk penyesuaian mapper."],
+        "normalized_provider_data": normalized_broker,
         "raw": candidate,
     }
 
