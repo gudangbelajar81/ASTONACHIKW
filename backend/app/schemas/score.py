@@ -40,6 +40,7 @@ class PredictionScoreResponse(BaseModel):
     entry_zone: list[float]
     target_1: float
     target_2: float
+    target_3: float | None = None
     stop_loss: float
     risk_reward: float
     score_components: dict[str, ScoreMetric]

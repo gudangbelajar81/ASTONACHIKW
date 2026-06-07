@@ -119,7 +119,8 @@ async def build_prediction_score(
     invalidation = f"Skenario batal jika harga menembus stop loss {recommendation['stop_loss']}."
     scenario = (
         f"Pantau entry {entry[0]}-{entry[1]}, target pertama {recommendation['target_1']}, "
-        f"target kedua {recommendation['target_2']}, risk/reward {recommendation['risk_reward']}x."
+        f"target kedua {recommendation['target_2']}, target ketiga {recommendation.get('target_3')}, "
+        f"risk/reward {recommendation['risk_reward']}x."
     )
     return {
         "symbol": recommendation["symbol"],
@@ -133,6 +134,7 @@ async def build_prediction_score(
         "entry_zone": recommendation["entry_zone"],
         "target_1": recommendation["target_1"],
         "target_2": recommendation["target_2"],
+        "target_3": recommendation.get("target_3"),
         "stop_loss": recommendation["stop_loss"],
         "risk_reward": recommendation["risk_reward"],
         "score_components": build_score_components(recommendation["score_breakdown"]),

@@ -15,6 +15,7 @@ from backend.app.services.prediction_engine import (
     load_price_frame,
     normalize_backend_ticker,
 )
+from backend.app.services.technical import build_technical_profile
 
 
 IDX_UNIVERSE = [
@@ -63,7 +64,15 @@ def compute_historical_score(window: pd.DataFrame, benchmark_window: pd.DataFram
     value_20 = volume_20 * _safe_float(close.tail(20).mean(), latest_close)
     volume_ratio = volume_5 / volume_20 if volume_20 > 0 else 1.0
     return_20 = latest_close / _safe_float(close.iloc[-21], latest_close) - 1 if len(close) > 21 else 0.0
-    technical_context = build_expanded_technical_context(enriched, latest_close, ma20, ma50, ma200)
+    try:
+        technical_profile = build_technical_profile(enriched, benchmark_window)
+    except Exception:
+        technical_profile = None
+    technical_context = (
+        technical_profile
+        if technical_profile
+        else build_expanded_technical_context(enriched, latest_close, ma20, ma50, ma200)
+    )
 
     relative_strength = 0.0
     if benchmark_window is not None and len(benchmark_window) > 21:
@@ -76,11 +85,11 @@ def compute_historical_score(window: pd.DataFrame, benchmark_window: pd.DataFram
     except Exception:
         bandarmology = {"verdict": "netral", "smart_money_score": 0.0}
 
-    trend_score = round(technical_context["score"] * 20)
-    momentum_score = round(clamp((return_20 + 0.04) / 0.12, 0, 1) * 15)
+    trend_score = round((technical_profile["trend_score"] / 100 * 20) if technical_profile else technical_context["score"] * 20)
+    momentum_score = round((technical_profile["momentum_score"] / 100 * 15) if technical_profile else clamp((return_20 + 0.04) / 0.12, 0, 1) * 15)
     liquidity_unit = min(1.0, value_20 / 5_000_000_000)
-    volume_score = round((clamp((volume_ratio - 0.8) / 0.8, 0, 1) * 0.65 + liquidity_unit * 0.35) * 15)
-    rs_score = min(10, max(0, round((relative_strength + 0.04) / 0.12 * 10)))
+    volume_score = round((technical_profile["volume_score"] / 100 * 15) if technical_profile else (clamp((volume_ratio - 0.8) / 0.8, 0, 1) * 0.65 + liquidity_unit * 0.35) * 15)
+    rs_score = round((technical_profile["relative_strength_score"] / 100 * 10) if technical_profile else min(10, max(0, round((relative_strength + 0.04) / 0.12 * 10))))
     smart_money = _safe_float(bandarmology.get("smart_money_score"))
     broker_component = 5
     foreign_component = 3
@@ -374,6 +383,7 @@ async def run_idx_screener(session: AsyncSession, request) -> dict[str, Any]:
                     "entry_zone": report["entry_zone"],
                     "target_1": report["target_1"],
                     "target_2": report["target_2"],
+                    "target_3": report.get("target_3"),
                     "stop_loss": report["stop_loss"],
                     "risk_reward": report["risk_reward"],
                     "avg_volume_20d": round(avg_volume_20, 2),
@@ -381,6 +391,9 @@ async def run_idx_screener(session: AsyncSession, request) -> dict[str, Any]:
                     "volume_ratio_5d": price_context["volume_ratio_5d"],
                     "relative_strength": price_context["relative_strength"],
                     "bandarmology": bandarmology.get("verdict", "netral"),
+                    "setup_type": report.get("technical_indicators", {}).get("setup_type"),
+                    "market_structure": report.get("technical_indicators", {}).get("market_structure"),
+                    "trend_state": report.get("technical_indicators", {}).get("trend_state"),
                     "backtest_confidence": None,
                     "backtest_win_rate": None,
                     "backtest_profit_factor": None,

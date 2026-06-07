@@ -10,6 +10,7 @@ from backend.app.db.models import MarketPrice, ModelWeightProfile, PredictionSna
 from backend.app.services.composite_engine import CycleCombination, calculate_composite_cycle
 from backend.app.services.context_engine import build_macro_context, build_sentiment_context
 from backend.app.services.market import fetch_market_data
+from backend.app.services.technical import build_technical_profile
 
 
 DEFAULT_COMBINATIONS = [
@@ -953,9 +954,14 @@ async def build_idx_recommendation(
     ma20 = _safe_float(latest.ma20, latest_close)
     ma50 = _safe_float(latest.ma50, latest_close)
     ma200 = _safe_float(latest.ma200, latest_close)
-    technical_context = build_expanded_technical_context(enriched, latest_close, ma20, ma50, ma200)
-    support = _safe_float(technical_context["support"], latest_close * 0.96)
-    resistance = _safe_float(technical_context["resistance"], latest_close * 1.04)
+    benchmark_df = None
+    try:
+        benchmark_df = await load_price_frame(session, "^JKSE" if market == "id" else "SPY", 260)
+    except Exception:
+        benchmark_df = None
+    technical_profile = build_technical_profile(enriched, benchmark_df, market=market)
+    support = _safe_float(technical_profile["support"], latest_close * 0.96)
+    resistance = _safe_float(technical_profile["resistance"], latest_close * 1.04)
     volume_5 = _safe_float(volume.tail(5).mean())
     volume_20 = _safe_float(volume.tail(20).mean())
     value_20 = volume_20 * _safe_float(close.tail(20).mean(), latest_close)
@@ -976,7 +982,8 @@ async def build_idx_recommendation(
     relative_strength = 0.0
     macro_available = False
     try:
-        benchmark_df = await load_price_frame(session, benchmark_symbol, 120)
+        if benchmark_df is None:
+            benchmark_df = await load_price_frame(session, benchmark_symbol, 120)
         stock_return = _pct_change(close, horizon_days)
         benchmark_return = _pct_change(benchmark_df["close"].astype(float), horizon_days)
         relative_strength = stock_return - benchmark_return
@@ -984,12 +991,10 @@ async def build_idx_recommendation(
     except Exception:
         stock_return = _pct_change(close, horizon_days)
 
-    trend_score = round(technical_context["score"] * 20)
-    momentum_score = round(clamp((stock_return + 0.04) / 0.12, 0, 1) * 15)
-    liquidity_unit = min(1.0, value_20 / 5_000_000_000) if market == "id" else 1.0
-    volume_unit = clamp((volume_ratio - 0.8) / 0.8, 0, 1)
-    volume_liquidity_score = round((volume_unit * 0.65 + liquidity_unit * 0.35) * 15)
-    relative_strength_score = min(10, max(0, round((relative_strength + 0.04) / 0.12 * 10)))
+    trend_score = round(technical_profile["trend_score"] / 100 * 20)
+    momentum_score = round(technical_profile["momentum_score"] / 100 * 15)
+    volume_liquidity_score = round(technical_profile["volume_score"] / 100 * 15)
+    relative_strength_score = round(technical_profile["relative_strength_score"] / 100 * 10)
     smart_money = _safe_float(bandarmology.get("smart_money_score"))
     normalized_provider_data = bandarmology.get("normalized_provider_data") or {}
     broker_accumulation_raw = _safe_float(normalized_provider_data.get("broker_accumulation_score"), 50.0)
@@ -1010,17 +1015,12 @@ async def build_idx_recommendation(
     sentiment_score = 3
     astro_cycle_score = 3
 
-    atr_proxy = _safe_float((enriched["high"].astype(float) - enriched["low"].astype(float)).tail(14).mean(), latest_close * 0.025)
-    stop_loss = min(support, latest_close - atr_proxy * 1.2)
-    if stop_loss >= latest_close:
-        stop_loss = latest_close * 0.97
-    target_1 = max(resistance, latest_close + atr_proxy * 1.8)
-    target_2 = max(target_1 * 1.03, latest_close + atr_proxy * 3.0)
-    entry_low = max(stop_loss * 1.01, latest_close - atr_proxy * 0.8)
-    entry_high = min(latest_close * 1.01, latest_close + atr_proxy * 0.2)
-    risk_per_share = max(entry_high - stop_loss, 0.01)
-    reward_per_share = max(target_1 - entry_high, 0.01)
-    risk_reward = round(reward_per_share / risk_per_share, 2)
+    entry_low, entry_high = technical_profile["entry_zone"]
+    stop_loss = technical_profile["stop_loss"]
+    target_1 = technical_profile["target_1"]
+    target_2 = technical_profile["target_2"]
+    target_3 = technical_profile["target_3"]
+    risk_reward = technical_profile["risk_reward"]
 
     score_breakdown = {
         "trend_score": int(trend_score),
@@ -1056,10 +1056,11 @@ async def build_idx_recommendation(
         reasons.append("Foreign/broker flow positif terhadap nilai transaksi.")
     if smart_money > 0:
         reasons.append("Smart money proxy masih positif.")
-    if technical_context["breakout_distance"] >= -0.03:
+    if technical_profile["breakout_status"] in {"near_breakout", "fresh_breakout"}:
         reasons.append("Harga berada dekat area breakout 30 hari.")
-    if technical_context["macd_histogram"] > 0:
+    if technical_profile["momentum"]["macd_histogram"] > 0:
         reasons.append("MACD histogram positif.")
+    reasons.extend(technical_profile["technical_reasons"])
     if risk_reward >= 1.5:
         reasons.append(f"Risk/reward masih layak di sekitar {risk_reward}x.")
     if not reasons:
@@ -1090,10 +1091,11 @@ async def build_idx_recommendation(
         "entry_zone": [_round_price(entry_low, market), _round_price(entry_high, market)],
         "target_1": _round_price(target_1, market),
         "target_2": _round_price(target_2, market),
+        "target_3": _round_price(target_3, market),
         "stop_loss": _round_price(stop_loss, market),
         "risk_reward": risk_reward,
         "score_breakdown": score_breakdown,
-        "technical_indicators": technical_context,
+        "technical_indicators": technical_profile,
         "bandarmology_components": {
             "smart_money_score": smart_money_component,
             "broker_accumulation": broker_accumulation_component,

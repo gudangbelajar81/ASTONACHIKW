@@ -16,11 +16,15 @@ type OpportunityItem = {
   entry_zone: number[];
   target_1: number;
   target_2: number;
+  target_3?: number | null;
   stop_loss: number;
   risk_reward: number;
   volume_ratio_5d: number;
   relative_strength: number;
   bandarmology: string;
+  setup_type?: string | null;
+  market_structure?: string | null;
+  trend_state?: string | null;
   backtest_confidence?: string | null;
   backtest_win_rate?: number | null;
   backtest_profit_factor?: number | null;
@@ -63,14 +67,14 @@ function OpportunityTable({ title, items }: { title: string; items: OpportunityI
               <div>
                 <h2>{item.symbol}</h2>
                 <p>
-                  {item.signal} • calibrated probability {formatPercent(item.calibrated_probability)} • {item.bandarmology}
+                  {item.signal} • {item.setup_type ?? "setup belum tersedia"} • calibrated probability {formatPercent(item.calibrated_probability)}
                 </p>
               </div>
               <span className="prediction-signal prediction-signal--bullish">{item.final_score}/100</span>
             </div>
             <div className="workflow-levels">
               <div><span>Entry</span><strong>{formatNumber(item.entry_zone[0])} - {formatNumber(item.entry_zone[1])}</strong></div>
-              <div><span>Target</span><strong>{formatNumber(item.target_1)} / {formatNumber(item.target_2)}</strong></div>
+              <div><span>Target</span><strong>{formatNumber(item.target_1)} / {formatNumber(item.target_2)} / {item.target_3 ? formatNumber(item.target_3) : "--"}</strong></div>
               <div><span>Stop Loss</span><strong>{formatNumber(item.stop_loss)}</strong></div>
               <div><span>R/R</span><strong>{item.risk_reward.toFixed(2)}x</strong></div>
               <div><span>Win Rate</span><strong>{formatPercent(item.backtest_win_rate)}</strong></div>
@@ -80,6 +84,9 @@ function OpportunityTable({ title, items }: { title: string; items: OpportunityI
             <div className="workflow-timeframes">
               <div><span>Volume</span><strong>{item.volume_ratio_5d.toFixed(2)}x</strong></div>
               <div><span>RS vs IHSG</span><strong>{formatPercent(item.relative_strength)}</strong></div>
+              <div><span>Structure</span><strong>{item.market_structure ?? "--"}</strong></div>
+              <div><span>Trend</span><strong>{item.trend_state ?? "--"}</strong></div>
+              <div><span>Bandar</span><strong>{item.bandarmology}</strong></div>
             </div>
             <div className="workflow-reasons">
               <h3>Alasan</h3>

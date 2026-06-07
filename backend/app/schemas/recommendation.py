@@ -47,6 +47,7 @@ class RecommendationResponse(BaseModel):
     entry_zone: list[float]
     target_1: float
     target_2: float
+    target_3: float | None = None
     stop_loss: float
     risk_reward: float
     score_breakdown: dict[str, int]

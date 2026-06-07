@@ -70,6 +70,7 @@ class ScreenerItem(BaseModel):
     entry_zone: list[float]
     target_1: float
     target_2: float
+    target_3: float | None = None
     stop_loss: float
     risk_reward: float
     avg_volume_20d: float
@@ -77,6 +78,9 @@ class ScreenerItem(BaseModel):
     volume_ratio_5d: float
     relative_strength: float
     bandarmology: str
+    setup_type: str | None = None
+    market_structure: str | None = None
+    trend_state: str | None = None
     backtest_confidence: str | None = None
     backtest_win_rate: float | None = None
     backtest_profit_factor: float | None = None
