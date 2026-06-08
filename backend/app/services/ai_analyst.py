@@ -417,65 +417,35 @@ def generate_with_provider(
     key_overrides: Optional[Dict[str, List[str]]] = None,
     model_overrides: Optional[Dict[str, str]] = None,
 ) -> str:
-    errors = []
-    if provider == "kie":
-        for key in get_provider_keys(provider, key_overrides):
-            try:
-                return call_kie_claude(
-                    api_key=key,
-                    model=get_provider_model(provider, model_overrides),
-                    prompt=prompt,
-                )
-            except Exception as exc:
-                errors.append(str(exc))
-        raise ValueError("; ".join(errors) or "KIE_API_KEY kosong")
-    if provider == "openai":
-        for key in get_provider_keys(provider, key_overrides):
-            try:
-                return call_openai_compatible(
-                    api_key=key,
-                    model=get_provider_model(provider, model_overrides),
-                    prompt=prompt,
-                )
-            except Exception as exc:
-                errors.append(str(exc))
-        raise ValueError("; ".join(errors) or "OPENAI_API_KEY kosong")
-    if provider == "gemini":
-        for key in get_provider_keys(provider, key_overrides):
-            try:
-                return call_gemini(
-                    api_key=key,
-                    model=get_provider_model(provider, model_overrides),
-                    prompt=prompt,
-                )
-            except Exception as exc:
-                errors.append(str(exc))
-        raise ValueError("; ".join(errors) or "GEMINI_API_KEY kosong")
-    if provider in {"deepseek", "deepseek-ai"}:
-        for key in get_provider_keys(provider, key_overrides):
-            try:
-                return call_openai_compatible(
-                    api_key=key,
-                    model=get_provider_model(provider, model_overrides),
-                    prompt=prompt,
-                    base_url="https://api.deepseek.com",
-                )
-            except Exception as exc:
-                errors.append(str(exc))
-        raise ValueError("; ".join(errors) or "DEEPSEEK_API_KEY kosong")
-    if provider in {"xai", "grok"}:
-        for key in get_provider_keys(provider, key_overrides):
-            try:
-                return call_openai_compatible(
-                    api_key=key,
-                    model=get_provider_model(provider, model_overrides),
-                    prompt=prompt,
-                    base_url="https://api.x.ai/v1",
-                )
-            except Exception as exc:
-                errors.append(str(exc))
-        raise ValueError("; ".join(errors) or "XAI_API_KEY kosong")
-    raise ValueError(f"Provider AI tidak dikenal: {provider}")
+    """Generate using provider with automatic key rotation."""
+    # Use the new provider manager
+    from backend.app.services.ai_provider_manager import provider_manager
+    
+    # Get provider order (default or override)
+    provider_order = [provider] if provider else provider_manager.provider_order
+    
+    try:
+        provider_name, response = provider_manager.generate_with_providers(
+            prompt, 
+            provider_order
+        )
+        return response
+    except ValueError as e:
+        # If all providers fail, fall back to local analysis
+        from backend.app.services.ai_analyst import local_analysis
+        from backend.app.schemas.analyst import AnalystInput
+        
+        # Create a dummy AnalystInput for local analysis
+        analyst_input = AnalystInput(
+            ticker="",
+            composite_cycle_data=[],
+            turning_points=[],
+            scanner_results=[],
+            data_context={"prompt": prompt}
+        )
+        
+        result = local_analysis(analyst_input)
+        return result.summary + "\n\n" + result.outlook + "\n\nNote: AI providers failed, using local analysis."
 
 
 async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
