@@ -52,7 +52,7 @@ const PLAN_OPTIONS: Record<PlanProfile["tier"], Pick<PlanProfile, "dailyApiLimit
 };
 
 export default function SettingsPage() {
-  const [section, setSection] = useState<"ai" | "media" | "market" | "mode" | "usage" | "backup">("ai");
+  const [section, setSection] = useState<"ai" | "media" | "market" | "macro" | "news" | "global" | "mode" | "usage" | "backup">("ai");
   const [providers, setProviders] = useState<ApiProviderConfig[]>(DEFAULT_API_PROVIDERS);
   const [marketProviders, setMarketProviders] = useState<MarketProviderConfig[]>(DEFAULT_MARKET_PROVIDERS);
   const [mediaProviders, setMediaProviders] = useState<MediaProviderConfig[]>(DEFAULT_MEDIA_PROVIDERS);
@@ -371,6 +371,15 @@ export default function SettingsPage() {
           <button className={section === "market" ? "active" : ""} type="button" onClick={() => setSection("market")}>
             Pusat Data IDX
           </button>
+          <button className={section === "global" ? "active" : ""} type="button" onClick={() => setSection("global")}>
+            Data Global
+          </button>
+          <button className={section === "macro" ? "active" : ""} type="button" onClick={() => setSection("macro")}>
+            Data Macro
+          </button>
+          <button className={section === "news" ? "active" : ""} type="button" onClick={() => setSection("news")}>
+            Data Berita
+          </button>
           <button className={section === "mode" ? "active" : ""} type="button" onClick={() => setSection("mode")}>
             Mode Pasar
           </button>
@@ -585,13 +594,13 @@ export default function SettingsPage() {
           <section className="api-center">
             <div className="api-center__topline">
               <div>
-                <h2>Data Provider Bandarmology IDX</h2>
-                <p>Provider ini disimpan di browser pengguna dan bisa dipakai untuk broker summary, foreign flow, dan order book saat API tersedia.</p>
+                <h2>Data Provider IDX (Bursa Efek Indonesia)</h2>
+                <p>Provider khusus untuk data pasar Indonesia: bandarmology, broker summary, foreign flow, dan order book.</p>
               </div>
             </div>
 
               <div className="market-provider-list">
-              {marketProviders.map((provider) => (
+              {marketProviders.filter((p) => p.category === "idx").map((provider) => (
                 <article className="market-provider-card" key={provider.id}>
                   <div className="market-provider-card__topline">
                     <div>
@@ -603,11 +612,17 @@ export default function SettingsPage() {
                     </span>
                   </div>
 
+                  {provider.placeholderEndpoint ? (
+                    <p className="page-subtitle" style={{ marginBottom: "8px", color: "#666" }}>
+                      💡 Contoh endpoint: <code>{provider.placeholderEndpoint}</code>
+                    </p>
+                  ) : null}
+
                   <label>
                     Endpoint API
                     <input
                       value={provider.endpoint}
-                      placeholder="https://provider-api.com/idx/broker-summary/{ticker}?days={days}"
+                      placeholder={provider.placeholderEndpoint || "https://provider-api.com/idx/{ticker}"}
                       onChange={(event) =>
                         saveMarketProviders(
                           marketProviders.map((item) =>
@@ -622,6 +637,255 @@ export default function SettingsPage() {
                     Pakai <code>{`{ticker}`}</code> dan <code>{`{days}`}</code> di endpoint kalau provider mendukung
                     template. Untuk RapidAPI, isi endpoint lengkap lalu cukup tempel API key.
                   </p>
+
+                  <label>
+                    API Key
+                    <input
+                      value={provider.apiKey}
+                      placeholder="Masukkan API key provider data"
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, apiKey: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
+
+                  <div className="market-provider-actions">
+                    <label className="provider-toggle">
+                      <input
+                        type="checkbox"
+                        checked={provider.enabled}
+                        onChange={(event) =>
+                          saveMarketProviders(
+                            marketProviders.map((item) =>
+                              item.id === provider.id ? { ...item, enabled: event.target.checked } : item
+                            )
+                          )
+                        }
+                      />
+                      Aktifkan provider
+                    </label>
+                    <button type="button" onClick={() => checkMarketProvider(provider)}>
+                      Cek Status
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {section === "global" ? (
+          <section className="api-center">
+            <div className="api-center__topline">
+              <div>
+                <h2>Data Provider Global Market</h2>
+                <p>Provider untuk data pasar global seperti MarketFlow, Yahoo Finance, Alpha Vantage, dll.</p>
+              </div>
+            </div>
+
+            <div className="market-provider-list">
+              {marketProviders.filter((p) => p.category === "global").map((provider) => (
+                <article className="market-provider-card" key={provider.id}>
+                  <div className="market-provider-card__topline">
+                    <div>
+                      <h3>{provider.name}</h3>
+                      <p>{provider.notes}</p>
+                    </div>
+                    <span className={`api-status api-status--${provider.status}`}>
+                      {provider.status === "live" ? "LIVE" : provider.status === "dead" ? "DEAD" : "BELUM CEK"}
+                    </span>
+                  </div>
+
+                  {provider.placeholderEndpoint ? (
+                    <p className="page-subtitle" style={{ marginBottom: "8px", color: "#666" }}>
+                      💡 Contoh endpoint: <code>{provider.placeholderEndpoint}</code>
+                    </p>
+                  ) : null}
+
+                  <label>
+                    Endpoint API
+                    <input
+                      value={provider.endpoint}
+                      placeholder={provider.placeholderEndpoint || "https://api.provider.com/market/{symbol}"}
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, endpoint: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    API Key
+                    <input
+                      value={provider.apiKey}
+                      placeholder="Masukkan API key provider data"
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, apiKey: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
+
+                  <div className="market-provider-actions">
+                    <label className="provider-toggle">
+                      <input
+                        type="checkbox"
+                        checked={provider.enabled}
+                        onChange={(event) =>
+                          saveMarketProviders(
+                            marketProviders.map((item) =>
+                              item.id === provider.id ? { ...item, enabled: event.target.checked } : item
+                            )
+                          )
+                        }
+                      />
+                      Aktifkan provider
+                    </label>
+                    <button type="button" onClick={() => checkMarketProvider(provider)}>
+                      Cek Status
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {section === "macro" ? (
+          <section className="api-center">
+            <div className="api-center__topline">
+              <div>
+                <h2>Data Provider Macro Economy</h2>
+                <p>Provider untuk data makro ekonomi: kalender ekonomi, BI Rate, inflasi, USD/IDR, komoditas, dll.</p>
+              </div>
+            </div>
+
+            <div className="market-provider-list">
+              {marketProviders.filter((p) => p.category === "macro").map((provider) => (
+                <article className="market-provider-card" key={provider.id}>
+                  <div className="market-provider-card__topline">
+                    <div>
+                      <h3>{provider.name}</h3>
+                      <p>{provider.notes}</p>
+                    </div>
+                    <span className={`api-status api-status--${provider.status}`}>
+                      {provider.status === "live" ? "LIVE" : provider.status === "dead" ? "DEAD" : "BELUM CEK"}
+                    </span>
+                  </div>
+
+                  {provider.placeholderEndpoint ? (
+                    <p className="page-subtitle" style={{ marginBottom: "8px", color: "#666" }}>
+                      💡 Contoh endpoint: <code>{provider.placeholderEndpoint}</code>
+                    </p>
+                  ) : null}
+
+                  <label>
+                    Endpoint API
+                    <input
+                      value={provider.endpoint}
+                      placeholder={provider.placeholderEndpoint || "https://api.provider.com/macro/indicators"}
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, endpoint: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    API Key
+                    <input
+                      value={provider.apiKey}
+                      placeholder="Masukkan API key provider data"
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, apiKey: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
+
+                  <div className="market-provider-actions">
+                    <label className="provider-toggle">
+                      <input
+                        type="checkbox"
+                        checked={provider.enabled}
+                        onChange={(event) =>
+                          saveMarketProviders(
+                            marketProviders.map((item) =>
+                              item.id === provider.id ? { ...item, enabled: event.target.checked } : item
+                            )
+                          )
+                        }
+                      />
+                      Aktifkan provider
+                    </label>
+                    <button type="button" onClick={() => checkMarketProvider(provider)}>
+                      Cek Status
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {section === "news" ? (
+          <section className="api-center">
+            <div className="api-center__topline">
+              <div>
+                <h2>Data Provider News & Sentiment</h2>
+                <p>Provider untuk berita ekonomi, RSS feed, sentiment analysis, dan news aggregator.</p>
+              </div>
+            </div>
+
+            <div className="market-provider-list">
+              {marketProviders.filter((p) => p.category === "news").map((provider) => (
+                <article className="market-provider-card" key={provider.id}>
+                  <div className="market-provider-card__topline">
+                    <div>
+                      <h3>{provider.name}</h3>
+                      <p>{provider.notes}</p>
+                    </div>
+                    <span className={`api-status api-status--${provider.status}`}>
+                      {provider.status === "live" ? "LIVE" : provider.status === "dead" ? "DEAD" : "BELUM CEK"}
+                    </span>
+                  </div>
+
+                  {provider.placeholderEndpoint ? (
+                    <p className="page-subtitle" style={{ marginBottom: "8px", color: "#666" }}>
+                      💡 Contoh endpoint: <code>{provider.placeholderEndpoint}</code>
+                    </p>
+                  ) : null}
+
+                  <label>
+                    Endpoint API
+                    <input
+                      value={provider.endpoint}
+                      placeholder={provider.placeholderEndpoint || "https://api.provider.com/news/finance"}
+                      onChange={(event) =>
+                        saveMarketProviders(
+                          marketProviders.map((item) =>
+                            item.id === provider.id ? { ...item, endpoint: event.target.value, status: "unknown" } : item
+                          )
+                        )
+                      }
+                    />
+                  </label>
 
                   <label>
                     API Key

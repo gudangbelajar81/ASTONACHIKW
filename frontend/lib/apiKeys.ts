@@ -15,17 +15,30 @@ export type ApiProviderConfig = {
   keys: ApiKeyEntry[];
 };
 
-export type MarketProviderId = "idx_broker" | "foreign_flow" | "orderbook" | "custom";
+export type MarketProviderId = 
+  | "idx_bandar_accumulation" 
+  | "idx_foreign_flow" 
+  | "idx_orderbook" 
+  | "idx_broker_summary"
+  | "marketflow_global"
+  | "macro_calendar"
+  | "macro_bi_rate"
+  | "news_rss"
+  | "custom";
+
+export type ProviderCategory = "idx" | "macro" | "news" | "global" | "custom";
 
 export type MarketProviderConfig = {
   id: MarketProviderId;
   name: string;
+  category: ProviderCategory;
   endpoint: string;
   apiKey: string;
   status: "unknown" | "live" | "dead";
   notes: string;
   enabled: boolean;
   lastChecked?: string;
+  placeholderEndpoint?: string;
 };
 
 export type MediaProviderId = "kie_image" | "kie_video";
@@ -55,40 +68,107 @@ export const DEFAULT_API_PROVIDERS: ApiProviderConfig[] = [
 ];
 
 export const DEFAULT_MARKET_PROVIDERS: MarketProviderConfig[] = [
+  // IDX Providers
   {
-    id: "idx_broker",
+    id: "idx_bandar_accumulation",
+    name: "IDX Bandar Accumulation",
+    category: "idx",
+    endpoint: "",
+    apiKey: "",
+    status: "unknown",
+    notes: "Analisis akumulasi dan distribusi bandar untuk saham IDX.",
+    placeholderEndpoint: "https://indonesia-stock-exchange-idx.p.rapidapi.com/api/analysis/bandar/accumulation/{ticker}?days={days}",
+    enabled: false,
+  },
+  {
+    id: "idx_broker_summary",
     name: "IDX Broker Summary",
+    category: "idx",
     endpoint: "",
     apiKey: "",
     status: "unknown",
-    notes: "Untuk broker net buy/sell, akumulasi bandar, dan distribusi.",
+    notes: "Broker net buy/sell dan top broker activity.",
+    placeholderEndpoint: "https://indonesia-stock-exchange-idx.p.rapidapi.com/api/broker/summary/{ticker}",
     enabled: false,
   },
   {
-    id: "foreign_flow",
-    name: "Foreign Flow",
+    id: "idx_foreign_flow",
+    name: "IDX Foreign Flow",
+    category: "idx",
     endpoint: "",
     apiKey: "",
     status: "unknown",
-    notes: "Untuk foreign net buy/sell dan aliran dana asing.",
+    notes: "Foreign net buy/sell dan aliran dana asing di IDX.",
+    placeholderEndpoint: "https://indonesia-stock-exchange-idx.p.rapidapi.com/api/foreign/flow/{ticker}",
     enabled: false,
   },
   {
-    id: "orderbook",
-    name: "Order Book / Running Trade",
+    id: "idx_orderbook",
+    name: "IDX Order Book / Running Trade",
+    category: "idx",
     endpoint: "",
     apiKey: "",
     status: "unknown",
-    notes: "Untuk order book imbalance, big lot, dan running trade.",
+    notes: "Order book imbalance, big lot, dan running trade realtime.",
+    placeholderEndpoint: "https://indonesia-stock-exchange-idx.p.rapidapi.com/api/orderbook/{ticker}",
     enabled: false,
   },
+  // Global Market Providers
+  {
+    id: "marketflow_global",
+    name: "MarketFlow Global Data",
+    category: "global",
+    endpoint: "",
+    apiKey: "",
+    status: "unknown",
+    notes: "Data pasar global dari MarketFlow API (US, Asia, Europe).",
+    placeholderEndpoint: "https://marketflow.p.rapidapi.com/api/market/{symbol}",
+    enabled: false,
+  },
+  // Macro Providers
+  {
+    id: "macro_calendar",
+    name: "Kalender Ekonomi",
+    category: "macro",
+    endpoint: "",
+    apiKey: "",
+    status: "unknown",
+    notes: "Kalender ekonomi global dan Indonesia (GDP, inflasi, suku bunga).",
+    placeholderEndpoint: "https://economic-calendar.p.rapidapi.com/api/events",
+    enabled: false,
+  },
+  {
+    id: "macro_bi_rate",
+    name: "BI Rate & Macro Indonesia",
+    category: "macro",
+    endpoint: "",
+    apiKey: "",
+    status: "unknown",
+    notes: "BI Rate, inflasi, USD/IDR, dan indikator makro Indonesia.",
+    placeholderEndpoint: "https://indonesia-macro.p.rapidapi.com/api/indicators",
+    enabled: false,
+  },
+  // News Providers
+  {
+    id: "news_rss",
+    name: "Berita Ekonomi RSS",
+    category: "news",
+    endpoint: "",
+    apiKey: "",
+    status: "unknown",
+    notes: "Feed berita ekonomi dan pasar dari berbagai sumber RSS.",
+    placeholderEndpoint: "https://news-api.p.rapidapi.com/api/rss/finance",
+    enabled: false,
+  },
+  // Custom Provider
   {
     id: "custom",
     name: "Custom Provider",
+    category: "custom",
     endpoint: "",
     apiKey: "",
     status: "unknown",
-    notes: "Untuk provider data lain yang formatnya nanti bisa dipetakan.",
+    notes: "Provider data custom yang formatnya bisa dipetakan sesuai kebutuhan.",
     enabled: false,
   },
 ];
