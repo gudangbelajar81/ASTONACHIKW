@@ -5,9 +5,9 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import { buildMarketProviderConfig, readMarketProviders } from "../../lib/apiKeys";
 import { normalizeTickerList, readMarketMode, writeMarketMode } from "../../lib/userData";
+import { getApiBaseUrl } from "../../lib/apiBase";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
+const API_BASE_URL = getApiBaseUrl();
 
 type WorkflowFrame = {
   label: string;

@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { getApiBaseUrl } from "../../lib/apiBase";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
+const API_BASE_URL = getApiBaseUrl();
 
 type TradeResult = {
   entry_date: string;

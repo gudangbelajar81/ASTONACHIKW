@@ -3,17 +3,9 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveCloudState, syncFromCloud } from "../../lib/cloudState";
+import { getApiBaseUrl } from "../../lib/apiBase";
 
-function getApiUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
-  if (configuredUrl) return configuredUrl;
-  if (typeof window !== "undefined" && window.location.hostname.endsWith(".up.railway.app")) {
-    return "https://astonachikw-production.up.railway.app";
-  }
-  return "http://127.0.0.1:8000";
-}
-
-const API_URL = getApiUrl();
+const API_URL = getApiBaseUrl();
 const DEMO_EMAIL = "demo@astrocycle.local";
 const DEMO_PASSWORD = "demo12345";
 const USERS_KEY = "astrocycle_local_users";

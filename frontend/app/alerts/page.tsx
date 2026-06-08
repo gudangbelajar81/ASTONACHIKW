@@ -13,9 +13,9 @@ import {
   writeAlerts,
 } from "../../lib/userData";
 import { saveCloudState } from "../../lib/cloudState";
+import { getApiBaseUrl } from "../../lib/apiBase";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "https://astonachikw-production.up.railway.app";
+const API_BASE_URL = getApiBaseUrl();
 
 type AlertResult = {
   alert: UserAlert;
