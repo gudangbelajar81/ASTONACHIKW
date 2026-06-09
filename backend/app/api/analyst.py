@@ -38,6 +38,7 @@ async def get_market_analysis(request: AnalystRequestBody) -> AnalystResponse:
             ai_provider_order=request.ai_provider_order,
             ai_api_keys=request.ai_api_keys,
             ai_models=request.ai_models,
+            ai_base_urls=request.ai_base_urls,
             data_context=request.data_context,
         )
 
@@ -62,7 +63,7 @@ async def get_market_analysis(request: AnalystRequestBody) -> AnalystResponse:
 @router.post("/analyst/test-key", response_model=AnalystKeyTestResponse)
 async def test_ai_key(request: AnalystKeyTestRequest) -> AnalystKeyTestResponse:
     try:
-        test_provider_key(request.provider, request.api_key, request.model)
+        test_provider_key(request.provider, request.api_key, request.model, request.base_url)
         return AnalystKeyTestResponse(
             provider=request.provider,
             status="live",

@@ -10,6 +10,7 @@ import {
   DEFAULT_MEDIA_PROVIDERS,
   MarketProviderConfig,
   MediaProviderConfig,
+  PROVIDER_MODELS,
   maskKey,
   readApiProviders,
   readMarketProviders,
@@ -229,6 +230,7 @@ export default function SettingsPage() {
           provider: activeProvider.id,
           api_key: entry.key,
           model: activeProvider.model,
+          base_url: activeProvider.baseUrl || undefined,
         }),
       });
       const result = await response.json();
@@ -413,14 +415,33 @@ export default function SettingsPage() {
                   <h2>{activeProvider.name} Keys</h2>
                   <p>{activeProvider.keys.length} key tersimpan di browser pengguna ini.</p>
                 </div>
+              </div>
+
+              <div className="api-provider-config">
+                <label>
+                  Base URL / Endpoint
+                  <input
+                    value={activeProvider.baseUrl}
+                    onChange={(event) =>
+                      updateActiveProvider((provider) => ({ ...provider, baseUrl: event.target.value }))
+                    }
+                    placeholder="https://api.provider.com/v1"
+                  />
+                </label>
                 <label>
                   Model
-                  <input
+                  <select
                     value={activeProvider.model}
                     onChange={(event) =>
                       updateActiveProvider((provider) => ({ ...provider, model: event.target.value }))
                     }
-                  />
+                  >
+                    {PROVIDER_MODELS[activeProvider.id]?.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
 

@@ -24,6 +24,7 @@ class AnalystInput:
         ai_provider_order: Optional[List[str]] = None,
         ai_api_keys: Optional[Dict[str, List[str]]] = None,
         ai_models: Optional[Dict[str, str]] = None,
+        ai_base_urls: Optional[Dict[str, str]] = None,
         data_context: Optional[Dict[str, Any]] = None,
     ):
         self.ticker = ticker
@@ -33,6 +34,7 @@ class AnalystInput:
         self.ai_provider_order = ai_provider_order or []
         self.ai_api_keys = ai_api_keys or {}
         self.ai_models = ai_models or {}
+        self.ai_base_urls = ai_base_urls or {}
         self.data_context = data_context or {}
 
 
@@ -416,36 +418,53 @@ def generate_with_provider(
     prompt: str,
     key_overrides: Optional[Dict[str, List[str]]] = None,
     model_overrides: Optional[Dict[str, str]] = None,
+    base_url_overrides: Optional[Dict[str, str]] = None,
 ) -> str:
     """Generate using provider with automatic key rotation."""
-    # Use the new provider manager
-    from backend.app.services.ai_provider_manager import provider_manager
+    normalized_provider = provider.strip().lower()
+    keys = get_provider_keys(normalized_provider, key_overrides)
+    model = get_provider_model(normalized_provider, model_overrides)
+    base_url = base_url_overrides.get(normalized_provider) if base_url_overrides else None
     
-    # Get provider order (default or override)
-    provider_order = [provider] if provider else provider_manager.provider_order
+    if not keys:
+        raise ValueError(f"No API keys available for provider: {provider}")
     
-    try:
-        provider_name, response = provider_manager.generate_with_providers(
-            prompt, 
-            provider_order
-        )
-        return response
-    except ValueError as e:
-        # If all providers fail, fall back to local analysis
-        from backend.app.services.ai_analyst import local_analysis
-        from backend.app.schemas.analyst import AnalystInput
-        
-        # Create a dummy AnalystInput for local analysis
-        analyst_input = AnalystInput(
-            ticker="",
-            composite_cycle_data=[],
-            turning_points=[],
-            scanner_results=[],
-            data_context={"prompt": prompt}
-        )
-        
-        result = local_analysis(analyst_input)
-        return result.summary + "\n\n" + result.outlook + "\n\nNote: AI providers failed, using local analysis."
+    # Try each key
+    for key in keys:
+        try:
+            if normalized_provider == "kie":
+                return call_kie_claude(api_key=key, model=model, prompt=prompt)
+            elif normalized_provider == "gemini":
+                return call_gemini(api_key=key, model=model, prompt=prompt)
+            elif normalized_provider in {"openai", "openai_compatible"} or base_url:
+                # Use custom base_url if provided
+                return call_openai_compatible(
+                    api_key=key,
+                    model=model,
+                    prompt=prompt,
+                    base_url=base_url if base_url else ("https://api.openai.com/v1" if normalized_provider == "openai" else None),
+                )
+            elif normalized_provider in {"deepseek", "deepseek-ai"}:
+                return call_openai_compatible(
+                    api_key=key,
+                    model=model,
+                    prompt=prompt,
+                    base_url="https://api.deepseek.com",
+                )
+            elif normalized_provider in {"xai", "grok"}:
+                return call_openai_compatible(
+                    api_key=key,
+                    model=model,
+                    prompt=prompt,
+                    base_url="https://api.x.ai/v1",
+                )
+            else:
+                raise ValueError(f"Unknown provider: {provider}")
+        except Exception as e:
+            print(f"Key failed for {provider}: {e}")
+            continue
+    
+    raise ValueError(f"All keys failed for provider: {provider}")
 
 
 async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
@@ -480,6 +499,7 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
                 prompt,
                 analyst_input.ai_api_keys,
                 analyst_input.ai_models,
+                analyst_input.ai_base_urls,
             )
             if response_text.strip():
                 return parse_generated_analysis(analyst_input.ticker, response_text)
@@ -490,7 +510,7 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
     return local_analysis(analyst_input)
 
 
-def test_provider_key(provider: str, api_key: str, model: Optional[str] = None) -> None:
+def test_provider_key(provider: str, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None) -> None:
     normalized_provider = provider.strip().lower()
 
     if normalized_provider == "kie":
@@ -510,6 +530,15 @@ def test_provider_key(provider: str, api_key: str, model: Optional[str] = None) 
     selected_model = model or get_provider_model(normalized_provider)
     prompt = "Jawab hanya dengan kata OK. Ini adalah tes koneksi API untuk AstroCycle."
 
+    # For OpenAI Compatible providers, use custom base_url if provided
+    if normalized_provider == "openai_compatible" or base_url:
+        call_openai_compatible(
+            api_key=api_key,
+            model=selected_model or "gpt-3.5-turbo",
+            prompt=prompt,
+            base_url=base_url or "https://api.openai.com/v1",
+        )
+        return
     if normalized_provider == "openai":
         call_openai_compatible(api_key=api_key, model=selected_model, prompt=prompt)
         return

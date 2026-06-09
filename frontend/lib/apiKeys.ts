@@ -1,4 +1,4 @@
-export type ApiProviderId = "kie" | "gemini" | "deepseek" | "xai" | "openai";
+export type ApiProviderId = "kie" | "gemini" | "deepseek" | "xai" | "openai" | "openai_compatible";
 
 export type ApiKeyEntry = {
   id: string;
@@ -12,6 +12,7 @@ export type ApiProviderConfig = {
   id: ApiProviderId;
   name: string;
   model: string;
+  baseUrl: string;
   keys: ApiKeyEntry[];
 };
 
@@ -59,12 +60,85 @@ export const API_KEYS_STORAGE_KEY = "astrocycle_api_provider_settings";
 export const MARKET_PROVIDER_STORAGE_KEY = "astrocycle_market_provider_settings";
 export const MEDIA_PROVIDER_STORAGE_KEY = "astrocycle_media_provider_settings";
 
+// Model options for each provider
+export const PROVIDER_MODELS: Record<ApiProviderId, string[]> = {
+  kie: [
+    "claude-opus-4-6",
+    "claude-opus-4-5",
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-6",
+    "claude-haiku-4-5",
+  ],
+  gemini: [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-pro",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+  ],
+  deepseek: [
+    "deepseek-chat",
+    "deepseek-coder",
+    "deepseek-reasoner",
+  ],
+  xai: [
+    "grok-4.3",
+    "grok-4.2",
+    "grok-4.1",
+    "grok-4",
+    "grok-3",
+  ],
+  openai: [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "gpt-4-turbo",
+    "gpt-4",
+    "gpt-3.5-turbo",
+  ],
+  openai_compatible: [
+    "gpt-3.5-turbo",
+    "gpt-3.5-turbo-16k",
+    "gpt-4",
+    "gpt-4-32k",
+    "gpt-4-turbo",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "claude-instant-1",
+    "claude-2",
+    "claude-3-haiku",
+    "claude-3-sonnet",
+    "claude-3-opus",
+    "llama-2-7b",
+    "llama-2-13b",
+    "llama-2-70b",
+    "llama-3-8b",
+    "llama-3-70b",
+    "mistral-7b",
+    "mixtral-8x7b",
+    "mixtral-8x22b",
+    "codellama-7b",
+    "codellama-13b",
+    "codellama-34b",
+    "deepseek-chat",
+    "deepseek-coder",
+    "qwen-7b",
+    "qwen-14b",
+    "qwen-72b",
+    "yi-6b",
+    "yi-34b",
+    "other",
+  ],
+};
+
 export const DEFAULT_API_PROVIDERS: ApiProviderConfig[] = [
-  { id: "kie", name: "Kie.ai / Claude", model: "claude-opus-4-6", keys: [] },
-  { id: "gemini", name: "Gemini", model: "gemini-2.5-flash", keys: [] },
-  { id: "deepseek", name: "DeepSeek", model: "deepseek-chat", keys: [] },
-  { id: "xai", name: "Grok / xAI", model: "grok-4.3", keys: [] },
-  { id: "openai", name: "OpenAI", model: "gpt-4o-mini", keys: [] },
+  { id: "kie", name: "Kie.ai / Claude", model: "claude-opus-4-6", baseUrl: "https://api.kie.ai/v1", keys: [] },
+  { id: "gemini", name: "Gemini", model: "gemini-2.5-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta", keys: [] },
+  { id: "deepseek", name: "DeepSeek", model: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1", keys: [] },
+  { id: "xai", name: "Grok / xAI", model: "grok-4.3", baseUrl: "https://api.x.ai/v1", keys: [] },
+  { id: "openai", name: "OpenAI", model: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1", keys: [] },
+  { id: "openai_compatible", name: "OpenAI Compatible", model: "gpt-3.5-turbo", baseUrl: "", keys: [] },
 ];
 
 export const DEFAULT_MARKET_PROVIDERS: MarketProviderConfig[] = [
@@ -222,6 +296,7 @@ export function buildAiRequestConfig(providers: ApiProviderConfig[]) {
   return {
     ai_provider_order: activeProviders.map((provider) => provider.id),
     ai_models: Object.fromEntries(activeProviders.map((provider) => [provider.id, provider.model])),
+    ai_base_urls: Object.fromEntries(activeProviders.map((provider) => [provider.id, provider.baseUrl])),
     ai_api_keys: Object.fromEntries(
       activeProviders.map((provider) => [
         provider.id,

@@ -41,6 +41,9 @@ class AnalystRequestBody(BaseModel):
     ai_models: Optional[Dict[str, str]] = Field(
         default=None, description="User-selected AI model by provider"
     )
+    ai_base_urls: Optional[Dict[str, str]] = Field(
+        default=None, description="User-provided base URLs by provider for OpenAI compatible endpoints"
+    )
     data_context: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Structured market context: OHLCV/technical/bandarmology/macro/sentiment/backtest/score components",
@@ -51,6 +54,7 @@ class AnalystKeyTestRequest(BaseModel):
     provider: str = Field(..., description="AI provider name")
     api_key: str = Field(..., description="API key to test")
     model: Optional[str] = Field(default=None, description="Model override")
+    base_url: Optional[str] = Field(default=None, description="Base URL for OpenAI compatible providers")
 
 
 class AnalystKeyTestResponse(BaseModel):
