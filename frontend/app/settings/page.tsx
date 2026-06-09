@@ -10,6 +10,7 @@ import {
   DEFAULT_MEDIA_PROVIDERS,
   MarketProviderConfig,
   MediaProviderConfig,
+  MEDIA_PROVIDER_MODELS,
   PROVIDER_MODELS,
   maskKey,
   readApiProviders,
@@ -546,13 +547,18 @@ export default function SettingsPage() {
               <div className="media-provider-grid">
                 <label>
                   Model
-                  <input
+                  <select
                     value={activeMediaProvider.model}
                     onChange={(event) =>
                       updateActiveMediaProvider((provider) => ({ ...provider, model: event.target.value }))
                     }
-                    placeholder={activeMediaProvider.id === "kie_image" ? "gpt4o-image" : "runway-duration-5-generate"}
-                  />
+                  >
+                    {MEDIA_PROVIDER_MODELS[activeMediaProvider.id]?.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label>

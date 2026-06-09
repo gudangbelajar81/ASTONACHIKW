@@ -69,6 +69,8 @@ export const PROVIDER_MODELS: Record<ApiProviderId, string[]> = {
     "claude-sonnet-4-5",
     "claude-haiku-4-6",
     "claude-haiku-4-5",
+    "kimi-k2.5",
+    "kimi-k2-thinking",
   ],
   gemini: [
     "gemini-2.5-flash",
@@ -246,6 +248,33 @@ export const DEFAULT_MARKET_PROVIDERS: MarketProviderConfig[] = [
     enabled: false,
   },
 ];
+
+// Model options for media providers
+export const MEDIA_PROVIDER_MODELS: Record<MediaProviderId, string[]> = {
+  kie_image: [
+    "gpt4o-image",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-6",
+    "kimi-k2.5",
+    "kimi-k2-thinking",
+    "dall-e-3",
+    "dall-e-2",
+    "midjourney-v6",
+    "midjourney-v5",
+    "stable-diffusion-xl",
+    "stable-diffusion-3",
+  ],
+  kie_video: [
+    "runway-duration-5-generate",
+    "runway-duration-10-generate",
+    "pika-text-to-video",
+    "pika-image-to-video",
+    "luma-dream-machine",
+    "kling-text-to-video",
+    "kling-image-to-video",
+  ],
+};
 
 export const DEFAULT_MEDIA_PROVIDERS: MediaProviderConfig[] = [
   {
