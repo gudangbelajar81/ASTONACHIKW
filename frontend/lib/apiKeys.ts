@@ -140,6 +140,13 @@ export const PROVIDER_MODELS: Record<ApiProviderId, string[]> = {
     "qwen-72b",
     "yi-6b",
     "yi-34b",
+    "kimi-k2.6-free",
+    "qwen3-coder-free",
+    "gpt-oss-120b-free",
+    "llama-3.3-70b-free",
+    "gemma-4-31b-free",
+    "glm-4.5-air-free",
+    "hermes-405b-free",
     "other",
   ],
 };

@@ -512,23 +512,21 @@ async def analyze_market(analyst_input: AnalystInput) -> AnalystOutput:
 
 def test_provider_key(provider: str, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None) -> None:
     normalized_provider = provider.strip().lower()
-
-    if normalized_provider == "kie":
-        response = urllib.request.urlopen(
-            urllib.request.Request(
-                "https://api.kie.ai/api/v1/chat/credit",
-                headers={"Authorization": f"Bearer {api_key}"},
-                method="GET",
-            ),
-            timeout=45,
-        )
-        body = json.loads(response.read().decode("utf-8"))
-        if response.status != 200 or body.get("code") != 200:
-            raise ValueError(body.get("msg") or "KIE_API_KEY tidak valid")
-        return
-
     selected_model = model or get_provider_model(normalized_provider)
     prompt = "Jawab hanya dengan kata OK. Ini adalah tes koneksi API untuk AstroCycle."
+
+    if normalized_provider == "kie":
+        try:
+            call_kie_claude(api_key=api_key, model=selected_model or "claude-opus-4-6", prompt=prompt)
+        except Exception:
+            # Fallback jika claude endpoint gagal, coba openai compatible endpoint
+            call_openai_compatible(
+                api_key=api_key,
+                model=selected_model or "claude-opus-4-6",
+                prompt=prompt,
+                base_url="https://api.kie.ai/v1",
+            )
+        return
 
     # For OpenAI Compatible providers, use custom base_url if provided
     if normalized_provider == "openai_compatible" or base_url:
