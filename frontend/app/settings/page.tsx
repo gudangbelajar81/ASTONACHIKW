@@ -240,6 +240,7 @@ export default function SettingsPage() {
         status: result.status === "live" ? "live" : "dead",
         lastChecked: new Date().toISOString(),
       }));
+      setStatusMessage(`${activeProvider.name} API: ${result.status === "live" ? "LIVE" : "DEAD"}${result.detail ? ` - ${result.detail}` : ""}`);
       appendUsageEvent({ action: "ai_key_check", ticker: activeProvider.id, source: "settings" });
     } catch {
       updateKey(entry.id, (current) => ({
@@ -247,6 +248,7 @@ export default function SettingsPage() {
         status: "dead",
         lastChecked: new Date().toISOString(),
       }));
+      setStatusMessage(`Gagal menghubungi server backend untuk cek key.`);
     } finally {
       setCheckingKeyId(null);
     }
