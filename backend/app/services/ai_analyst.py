@@ -1,9 +1,18 @@
 import json
 import urllib.error
 import urllib.request
+import ssl
 from typing import Dict, Any, List, Optional
+
+import httpx
 from openai import OpenAI, APIError
 from backend.app.core.config import settings
+
+# Disable SSL verification globally for urllib to fix Windows CA cert issues
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
 
 AI_SYSTEM_MESSAGE = (
     "Anda adalah narator data pasar untuk trader ritel di Asia. "
@@ -199,6 +208,10 @@ def call_openai_compatible(
     client_kwargs: dict[str, Any] = {"api_key": api_key}
     if base_url:
         client_kwargs["base_url"] = base_url
+        
+    # Disable SSL verification for httpx to bypass Windows cert issues
+    client_kwargs["http_client"] = httpx.Client(verify=False)
+    
     client = OpenAI(**client_kwargs)
     message = client.chat.completions.create(
         model=model,
