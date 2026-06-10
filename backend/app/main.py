@@ -11,6 +11,7 @@ from backend.app.api.predictions import router as predictions_router
 from backend.app.api.context import router as context_router
 from backend.app.api.ohlcv import router as ohlcv_router
 from backend.app.api.kie_media import router as kie_media_router
+from backend.app.api.dsi_radar import router as dsi_radar_router
 from backend.app.core.config import settings
 
 frontend_origins = [origin.strip() for origin in settings.FRONTEND_URL.split(",") if origin.strip()]
@@ -40,6 +41,7 @@ app.include_router(predictions_router, prefix="/api")
 app.include_router(context_router, prefix="/api")
 app.include_router(ohlcv_router, prefix="/api")
 app.include_router(kie_media_router, prefix="/api")
+app.include_router(dsi_radar_router, prefix="/api")
 
 
 @app.get("/")

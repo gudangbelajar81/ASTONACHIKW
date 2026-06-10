@@ -139,9 +139,17 @@ async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+import { useTicker } from "../../context/TickerContext";
+
 export default function DashboardPage() {
-  const [tickerInput, setTickerInput] = useState("AAPL");
-  const [ticker, setTicker] = useState("AAPL");
+  const { globalTicker, setGlobalTicker } = useTicker();
+  const currentTicker = globalTicker || "AAPL";
+  const [tickerInput, setTickerInput] = useState(currentTicker);
+  
+  // Sync input ketika globalTicker berubah dari halaman lain
+  useEffect(() => {
+    if (globalTicker) setTickerInput(globalTicker);
+  }, [globalTicker]);
   const [data, setData] = useState<DashboardData>({
     composite: [],
     scanner: [],
@@ -297,8 +305,8 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    void loadDashboard(ticker);
-  }, [loadDashboard, ticker]);
+    void loadDashboard(currentTicker);
+  }, [loadDashboard, currentTicker]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -335,7 +343,7 @@ export default function DashboardPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
-    if (normalizedTicker) setTicker(normalizedTicker);
+    if (normalizedTicker) setGlobalTicker(normalizedTicker);
   }
 
   return (
@@ -486,7 +494,7 @@ export default function DashboardPage() {
             <div className="chart-panel">
               <div className="chart-panel__topline">
                 <div>
-                  <h2>Siklus Komposit {ticker}</h2>
+                  <h2>Siklus Komposit {currentTicker}</h2>
                   <p>Gabungan default Venus-Jupiter, Moon-Saturn, dan Mercury-Mars</p>
                 </div>
                 <span>{chartData.length} titik</span>
@@ -523,7 +531,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <AIInfoPanel analysis={data.analysis} loading={analysisLoading} error={analysisError} ticker={ticker} />
+          <AIInfoPanel analysis={data.analysis} loading={analysisLoading} error={analysisError} ticker={currentTicker} />
         </div>
       </main>
     </div>

@@ -2,6 +2,7 @@ import pandas as pd
 
 from backend.app.services.technical.common import clamp, safe_float, score_0_100
 from backend.app.services.technical.indicators import adx, atr, bollinger_position, ichimoku, macd, moving_average, roc, rsi, stochastic, vwap
+from backend.app.services.technical.liquidity_filter import analyze_liquidity
 from backend.app.services.technical.relative_strength import relative_strength_profile
 from backend.app.services.technical.risk_engine import atr_trade_plan
 from backend.app.services.technical.setup_detector import detect_setup
@@ -76,7 +77,7 @@ def trend_layer(df: pd.DataFrame, structure: dict, atr_value: float) -> dict:
     }
 
 
-def build_technical_profile(df: pd.DataFrame, benchmark_df: pd.DataFrame | None = None, market: str = "id") -> dict:
+def build_technical_profile(df: pd.DataFrame, benchmark_df: pd.DataFrame | None = None, market: str = "id", symbol: str = "") -> dict:
     clean = df.sort_values("date").reset_index(drop=True)
     if len(clean) < 60:
         raise ValueError("Data tidak cukup untuk Technical Engine v2. Minimal 60 candle.")
@@ -88,6 +89,8 @@ def build_technical_profile(df: pd.DataFrame, benchmark_df: pd.DataFrame | None 
     momentum = momentum_layer(clean)
     volume = volume_liquidity(clean)
     relative_strength = relative_strength_profile(clean, benchmark_df)
+    # ── Liquidity & Gorengan Analysis ──────────────────────────────
+    liquidity_analysis = analyze_liquidity(clean, symbol=symbol)
     risk_plan = atr_trade_plan(
         last_price=last_price,
         atr=atr_value,
@@ -135,6 +138,14 @@ def build_technical_profile(df: pd.DataFrame, benchmark_df: pd.DataFrame | None 
         risks.append("Breakdown terdeteksi, skenario bullish berisiko gagal.")
     risks.append(f"Jika close di bawah {risk_plan['stop_loss']}, skenario bullish invalid.")
 
+    # ── Gorengan risks ke dalam technical_risks ───────────────────
+    liquidity_result_dict = liquidity_analysis.to_dict()
+    if liquidity_analysis.is_gorengan:
+        risks.insert(0, liquidity_analysis.summary)
+    for w in liquidity_analysis.warnings[:2]:
+        if w.severity in ("EXTREME_WARNING", "WARNING"):
+            risks.append(w.message)
+
     return {
         "technical_score": technical_score,
         "trend_score": trend["trend_score"],
@@ -165,5 +176,14 @@ def build_technical_profile(df: pd.DataFrame, benchmark_df: pd.DataFrame | None 
         "setup": setup,
         "atr": round(atr_value, 4),
         "technical_reasons": reasons[:6],
-        "technical_risks": risks[:5],
+        "technical_risks": risks[:7],
+        # ── Liquidity & Gorengan Analysis ────────────────────────
+        "liquidity_analysis": liquidity_result_dict,
+        "liquidity_grade": liquidity_analysis.liquidity_grade,
+        "is_gorengan": liquidity_analysis.is_gorengan,
+        "gorengan_risk_level": liquidity_analysis.gorengan_risk_level,
+        "liquidity_warnings": [
+            {"code": w.code, "severity": w.severity, "message": w.message}
+            for w in liquidity_analysis.warnings
+        ],
     }

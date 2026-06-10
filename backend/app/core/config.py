@@ -82,6 +82,13 @@ class Settings(BaseSettings):
     GPT5_O3_API_KEY: str = ""
     GPT5_O3_MODEL: str = "gpt-5-o3"
 
+    # ── Data Provider: EODHD (Intraday + EOD) ──
+    EODHD_API_KEY: str = ""
+    # Exchange default untuk IDX Indonesia
+    EODHD_EXCHANGE: str = "JK"
+    # Aktifkan EODHD sebagai sumber data intraday (1m/5m/15m/30m/1h/4h)
+    EODHD_ENABLED: bool = True
+
     @property
     def effective_database_url(self) -> str:
         is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))

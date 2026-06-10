@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { useTicker } from "../../context/TickerContext";
 import { appendReportLog, appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 import { saveCloudState } from "../../lib/cloudState";
 
@@ -110,8 +111,13 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export default function ReportPage() {
-  const [tickerInput, setTickerInput] = useState("AAPL");
-  const [ticker, setTicker] = useState("AAPL");
+  const { globalTicker, setGlobalTicker } = useTicker();
+  const currentTicker = globalTicker || "AAPL";
+  const [tickerInput, setTickerInput] = useState(currentTicker);
+  
+  useEffect(() => {
+    if (globalTicker) setTickerInput(globalTicker);
+  }, [globalTicker]);
   const [report, setReport] = useState<ReportBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
@@ -156,13 +162,13 @@ export default function ReportPage() {
   }
 
   useEffect(() => {
-    void loadReport(ticker);
-  }, [ticker]);
+    void loadReport(currentTicker);
+  }, [currentTicker]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
-    if (normalizedTicker) setTicker(normalizedTicker);
+    if (normalizedTicker) setGlobalTicker(normalizedTicker);
   }
 
   function printReport() {

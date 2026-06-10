@@ -17,6 +17,7 @@ export type ApiProviderConfig = {
 };
 
 export type MarketProviderId = 
+  | "eodhd_intraday"
   | "idx_bandar_accumulation" 
   | "idx_foreign_flow" 
   | "idx_orderbook" 
@@ -107,11 +108,19 @@ export const PROVIDER_MODELS: Record<ApiProviderId, string[]> = {
     "gpt-4-turbo",
     "gpt-4o",
     "gpt-4o-mini",
+    "claude-opus-4-6",
+    "claude-opus-4-5",
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-6",
+    "claude-haiku-4-5",
     "claude-instant-1",
     "claude-2",
     "claude-3-haiku",
     "claude-3-sonnet",
     "claude-3-opus",
+    "kimi-k2.5",
+    "kimi-k2-thinking",
     "llama-2-7b",
     "llama-2-13b",
     "llama-2-70b",
@@ -125,6 +134,7 @@ export const PROVIDER_MODELS: Record<ApiProviderId, string[]> = {
     "codellama-34b",
     "deepseek-chat",
     "deepseek-coder",
+    "deepseek-reasoner",
     "qwen-7b",
     "qwen-14b",
     "qwen-72b",
@@ -144,6 +154,18 @@ export const DEFAULT_API_PROVIDERS: ApiProviderConfig[] = [
 ];
 
 export const DEFAULT_MARKET_PROVIDERS: MarketProviderConfig[] = [
+  // ── EODHD Intraday (Prioritas Utama untuk DSI Radar) ──
+  {
+    id: "eodhd_intraday",
+    name: "📊 EODHD Intraday Data",
+    category: "global",
+    endpoint: "https://eodhd.com/api/intraday/{symbol}?interval=1m&api_token={api_key}&fmt=json",
+    apiKey: "",
+    status: "unknown",
+    notes: "Provider EODHD untuk data intraday IDX (1m/5m/15m/30m/1h/4h/D). Masukkan API key Anda dari eodhd.com. Digunakan oleh DSI Radar untuk data real-time.",
+    placeholderEndpoint: "https://eodhd.com/api/intraday/BBCA.JK?interval=1m&api_token=YOUR_KEY&fmt=json",
+    enabled: false,
+  },
   // IDX Providers
   {
     id: "idx_bandar_accumulation",

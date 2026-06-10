@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { useTicker } from "../../context/TickerContext";
 import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
@@ -84,8 +85,14 @@ function formatPercent(value: number | null | undefined) {
 }
 
 export default function PerformancePage() {
-  const [tickerInput, setTickerInput] = useState("AAPL");
-  const [ticker, setTicker] = useState("AAPL");
+  const { globalTicker, setGlobalTicker } = useTicker();
+  const currentTicker = globalTicker || "AAPL";
+  const [tickerInput, setTickerInput] = useState(currentTicker);
+  
+  useEffect(() => {
+    if (globalTicker) setTickerInput(globalTicker);
+  }, [globalTicker]);
+  
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [training, setTraining] = useState(false);
@@ -114,15 +121,15 @@ export default function PerformancePage() {
     setTraining(true);
     setError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/model-weights/${encodeURIComponent(ticker)}/train?horizon_days=30`, {
+      const response = await fetch(`${API_BASE_URL}/api/model-weights/${encodeURIComponent(currentTicker)}/train?horizon_days=30`, {
         method: "POST",
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.detail ?? `${response.status} ${response.statusText}`);
       }
-      await loadReport(ticker);
-      appendUsageEvent({ action: "model_train", ticker, source: "performance" });
+      await loadReport(currentTicker);
+      appendUsageEvent({ action: "model_train", ticker: currentTicker, source: "performance" });
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : "Gagal melatih ulang bobot model.");
     } finally {
@@ -131,13 +138,13 @@ export default function PerformancePage() {
   }
 
   useEffect(() => {
-    void loadReport(ticker);
-  }, [ticker]);
+    void loadReport(currentTicker);
+  }, [currentTicker]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
-    if (normalizedTicker) setTicker(normalizedTicker);
+    if (normalizedTicker) setGlobalTicker(normalizedTicker);
   }
 
   return (

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ColorType, createChart, ISeriesApi, Time } from "lightweight-charts";
 import Sidebar from "../../components/Sidebar";
+import { useTicker } from "../../context/TickerContext";
 import { buildMarketProviderConfig, readMarketProviders } from "../../lib/apiKeys";
 import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
@@ -49,8 +50,13 @@ function formatPercent(value: number) {
 }
 
 export default function OHLCVPage() {
-  const [tickerInput, setTickerInput] = useState("AAPL");
-  const [ticker, setTicker] = useState("AAPL");
+  const { globalTicker, setGlobalTicker } = useTicker();
+  const currentTicker = globalTicker || "AAPL";
+  const [tickerInput, setTickerInput] = useState(currentTicker);
+  
+  useEffect(() => {
+    if (globalTicker) setTickerInput(globalTicker);
+  }, [globalTicker]);
   const [report, setReport] = useState<OHLCVReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -98,8 +104,8 @@ export default function OHLCVPage() {
   }
 
   useEffect(() => {
-    void loadReport(ticker);
-  }, [ticker]);
+    void loadReport(currentTicker);
+  }, [currentTicker]);
 
   useEffect(() => {
     if (!chartRef.current || !volumeRef.current) return;
@@ -176,7 +182,7 @@ export default function OHLCVPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
-    if (normalizedTicker) setTicker(normalizedTicker);
+    if (normalizedTicker) setGlobalTicker(normalizedTicker);
   }
 
   const latestClose = useMemo(() => report?.points.at(-1)?.close, [report]);
@@ -212,7 +218,7 @@ export default function OHLCVPage() {
           <section className="ohlcv-chart-panel">
             <div className="chart-panel__topline">
               <div>
-                <h2>{report?.ticker ?? ticker} Candlestick</h2>
+                <h2>{report?.ticker ?? currentTicker} Candlestick</h2>
                 <p>MA20 biru, MA50 kuning, MA200 ungu. Close terakhir: {latestClose ?? "--"}</p>
               </div>
               <span>{liveProviderLabel}</span>

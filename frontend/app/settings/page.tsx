@@ -366,22 +366,28 @@ export default function SettingsPage() {
 
         <div className="settings-section-tabs">
           <button className={section === "ai" ? "active" : ""} type="button" onClick={() => setSection("ai")}>
-            Pusat AI
+            <span>Pusat AI</span>
+            <span className="tab-badge tab-badge--required">Wajib</span>
           </button>
           <button className={section === "media" ? "active" : ""} type="button" onClick={() => setSection("media")}>
-            Pusat Media
+            <span>Pusat Media</span>
+            <span className="tab-badge tab-badge--optional">Opsional</span>
           </button>
           <button className={section === "market" ? "active" : ""} type="button" onClick={() => setSection("market")}>
-            Pusat Data IDX
+            <span>Pusat Data IDX</span>
+            <span className="tab-badge tab-badge--optional">Opsional</span>
           </button>
           <button className={section === "global" ? "active" : ""} type="button" onClick={() => setSection("global")}>
-            Data Global
+            <span>Data Global</span>
+            <span className="tab-badge tab-badge--optional">Opsional</span>
           </button>
           <button className={section === "macro" ? "active" : ""} type="button" onClick={() => setSection("macro")}>
-            Data Macro
+            <span>Data Macro</span>
+            <span className="tab-badge tab-badge--optional">Opsional</span>
           </button>
           <button className={section === "news" ? "active" : ""} type="button" onClick={() => setSection("news")}>
-            Data Berita
+            <span>Data Berita</span>
+            <span className="tab-badge tab-badge--optional">Opsional</span>
           </button>
           <button className={section === "mode" ? "active" : ""} type="button" onClick={() => setSection("mode")}>
             Mode Pasar

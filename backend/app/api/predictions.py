@@ -2,12 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.db.session import get_session
-from backend.app.schemas.backtest import BacktestRequest, BacktestResponse, ScreenerRequest, ScreenerResponse
+from backend.app.schemas.backtest import (
+    BacktestRequest, BacktestResponse,
+    ScreenerRequest, ScreenerResponse,
+    SetupBacktestRequest, SetupBacktestResponse,
+)
 from backend.app.schemas.prediction import ModelWeightResponse, PerformanceResponse, PredictionResponse, WatchlistResponse
 from backend.app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from backend.app.schemas.score import PredictionScoreRequest, PredictionScoreResponse
 from backend.app.schemas.workflow import WorkflowResponse
-from backend.app.services.idx_backtest import run_idx_backtest, run_idx_screener
+from backend.app.services.idx_backtest import run_idx_backtest, run_idx_screener, run_setup_backtest
 from backend.app.services.prediction_engine import (
     build_idx_recommendation,
     build_idx_workflow,
@@ -193,3 +197,21 @@ async def run_idx_screener_report(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gagal menjalankan IDX screener: {exc}")
+
+
+@router.post("/idx/backtest/setup", response_model=SetupBacktestResponse)
+async def run_idx_setup_backtest(
+    request: SetupBacktestRequest,
+    session: AsyncSession = Depends(get_session),
+) -> SetupBacktestResponse:
+    """
+    Backtest per setup type (breakout, pullback, continuation, reversal).
+    Membantu trader memvalidasi setup mana yang paling reliable untuk saham tertentu.
+    """
+    try:
+        report = await run_setup_backtest(session, request)
+        return SetupBacktestResponse(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal menjalankan setup backtest: {exc}")

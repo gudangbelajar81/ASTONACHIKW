@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { useTicker } from "../../context/TickerContext";
 import { appendUsageEvent, normalizeTickerForMarket, readMarketMode } from "../../lib/userData";
 
 const API_BASE_URL =
@@ -26,8 +27,13 @@ function formatPercent(value: number) {
 }
 
 export default function ExplainPage() {
-  const [tickerInput, setTickerInput] = useState("AAPL");
-  const [ticker, setTicker] = useState("AAPL");
+  const { globalTicker, setGlobalTicker } = useTicker();
+  const currentTicker = globalTicker || "AAPL";
+  const [tickerInput, setTickerInput] = useState(currentTicker);
+  
+  useEffect(() => {
+    if (globalTicker) setTickerInput(globalTicker);
+  }, [globalTicker]);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,13 +58,13 @@ export default function ExplainPage() {
   }
 
   useEffect(() => {
-    void loadPrediction(ticker);
-  }, [ticker]);
+    void loadPrediction(currentTicker);
+  }, [currentTicker]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedTicker = normalizeTickerForMarket(tickerInput, readMarketMode());
-    if (normalizedTicker) setTicker(normalizedTicker);
+    if (normalizedTicker) setGlobalTicker(normalizedTicker);
   }
 
   return (
