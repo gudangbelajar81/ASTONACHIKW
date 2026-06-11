@@ -256,7 +256,7 @@ def call_gemini(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
-    url = "https://api.kie.ai/claude/v1/messages"
+    url = "https://api.kie.ai/v1/messages"
     payload = {
         "model": model,
         "max_tokens": 1500,
