@@ -4,7 +4,12 @@ import urllib.request
 import ssl
 from typing import Dict, Any, List, Optional
 
-import httpx
+try:
+    import httpx
+    HAS_HTTPX = True
+except ImportError:
+    HAS_HTTPX = False
+
 from openai import OpenAI, APIError
 from backend.app.core.config import settings
 
@@ -210,7 +215,8 @@ def call_openai_compatible(
         client_kwargs["base_url"] = base_url
         
     # Disable SSL verification for httpx to bypass Windows cert issues
-    client_kwargs["http_client"] = httpx.Client(verify=False)
+    if HAS_HTTPX:
+        client_kwargs["http_client"] = httpx.Client(verify=False)
     
     client = OpenAI(**client_kwargs)
     message = client.chat.completions.create(
