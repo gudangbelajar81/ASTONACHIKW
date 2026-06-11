@@ -262,18 +262,17 @@ def call_gemini(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
-    url = "https://api.kie.ai/v1/messages"
+    """Kie.ai menggunakan OpenAI-compatible endpoint, bukan Claude-style."""
+    url = "https://api.kie.ai/api/v1/chat/completions"
     payload = {
         "model": model,
-        "max_tokens": 1500,
-        "temperature": 0.1,
-        "system": AI_SYSTEM_MESSAGE,
         "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
+            {"role": "system", "content": AI_SYSTEM_MESSAGE},
+            {"role": "user", "content": prompt}
         ],
+        "temperature": 0.1,
+        "max_tokens": 1500,
+        "stream": False
     }
     request = urllib.request.Request(
         url,
@@ -281,8 +280,6 @@ def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
-            "X-Api-Key": api_key,
-            "anthropic-version": "2023-06-01",
         },
         method="POST",
     )
@@ -290,10 +287,13 @@ def call_kie_claude(*, api_key: str, model: str, prompt: str) -> str:
     with urllib.request.urlopen(request, timeout=45) as response:
         body = json.loads(response.read().decode("utf-8"))
 
-    content = body.get("content") or []
-    text = "".join(block.get("text", "") for block in content if isinstance(block, dict))
+    # OpenAI-compatible response format
+    if response.status != 200 or body.get("code") != 200:
+        raise ValueError(body.get("msg") or "Kie.ai API error")
+    
+    text = body.get("choices", [{}])[0].get("message", {}).get("content", "")
     if not text.strip():
-        raise ValueError("Kie.ai Claude mengembalikan jawaban kosong.")
+        raise ValueError("Kie.ai mengembalikan jawaban kosong.")
     return text
 
 
@@ -535,16 +535,8 @@ def test_provider_key(provider: str, api_key: str, model: Optional[str] = None, 
     prompt = "Jawab hanya dengan kata OK. Ini adalah tes koneksi API untuk AstroCycle."
 
     if normalized_provider == "kie":
-        try:
-            call_kie_claude(api_key=api_key, model=selected_model or "claude-opus-4-6", prompt=prompt)
-        except Exception:
-            # Fallback jika claude endpoint gagal, coba openai compatible endpoint
-            call_openai_compatible(
-                api_key=api_key,
-                model=selected_model or "claude-opus-4-6",
-                prompt=prompt,
-                base_url="https://api.kie.ai/v1",
-            )
+        # Kie.ai menggunakan OpenAI-compatible endpoint
+        call_kie_claude(api_key=api_key, model=selected_model or "claude-opus-4-6", prompt=prompt)
         return
 
     # For OpenAI Compatible providers, use custom base_url if provided

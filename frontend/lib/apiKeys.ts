@@ -159,7 +159,7 @@ export const PROVIDER_MODELS: Record<ApiProviderId, string[]> = {
 };
 
 export const DEFAULT_API_PROVIDERS: ApiProviderConfig[] = [
-  { id: "kie", name: "Kie.ai / Claude", model: "claude-opus-4-6", baseUrl: "https://api.kie.ai/v1", keys: [] },
+  { id: "kie", name: "Kie.ai / Claude", model: "claude-opus-4-6", baseUrl: "https://api.kie.ai/api/v1", keys: [] },
   { id: "gemini", name: "Gemini", model: "gemini-2.5-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta", keys: [] },
   { id: "deepseek", name: "DeepSeek", model: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1", keys: [] },
   { id: "xai", name: "Grok / xAI", model: "grok-4.3", baseUrl: "https://api.x.ai/v1", keys: [] },
